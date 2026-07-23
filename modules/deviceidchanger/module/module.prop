@@ -1,0 +1,6 @@
+id=deviceidchanger
+name=DeviceID+ (fork sidex15)
+version=v2.0.0
+versionCode=2000000
+author=sidex15, UnlockXiaomi fork
+description=Fork of sidex15/deviceidchanger. SSAID manager per app, build prop spoof, ADB/Dev watcher and TrickyStore target editor. AGPL-3.0.

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>DeviceID+</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --bg2: #171a21;
+    --card: #1d212b;
+    --border: #2b313e;
+    --fg: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #4f8cff;
+    --accent-dim: #2c4a80;
+    --danger: #e05555;
+    --ok: #3fbf7f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, Roboto, sans-serif; font-size: 15px; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--bg2);
+    border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0; padding: 12px 16px 4px; font-size: 17px; font-weight: 600; }
+  nav.tabs { display: flex; overflow-x: auto; }
+  nav.tabs button { flex: 1 0 auto; background: none; border: none; color: var(--muted);
+    padding: 10px 12px; font-size: 14px; border-bottom: 2px solid transparent; cursor: pointer; }
+  nav.tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+  main { padding: 12px; max-width: 720px; margin: 0 auto; }
+  section.tabpage { display: none; }
+  section.tabpage.active { display: block; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .grow { flex: 1 1 auto; min-width: 0; }
+  button.btn { background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button.btn.secondary { background: var(--bg2); color: var(--fg); border: 1px solid var(--border); }
+  button.btn.danger { background: var(--danger); }
+  button.btn.small { padding: 4px 10px; font-size: 13px; }
+  button.btn:disabled { opacity: .5; }
+  input[type=text], input[type=search] { background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--fg); padding: 8px 10px; font-size: 14px; width: 100%; }
+  input.mono { font-family: ui-monospace, monospace; letter-spacing: .05em; }
+  label.chk { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .appitem { border-top: 1px solid var(--border); padding: 8px 2px; }
+  .appitem:first-child { border-top: none; }
+  .appitem .pkg { font-size: 14px; word-break: break-all; }
+  .appitem .ssaid { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ok); }
+  .appitem .ssaid.none { color: var(--muted); }
+  .appitem .sub { margin: 6px 0 2px 28px; display: flex; flex-direction: column; gap: 6px; }
+  .hidden { display: none !important; }
+  .listbox { max-height: 55vh; overflow-y: auto; }
+  #modal-wrap { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; max-width: 340px; width: 100%; }
+  #modal p { margin: 0 0 16px; }
+  #modal .row { justify-content: flex-end; }
+  #statusbar { position: sticky; bottom: 0; background: var(--bg2); border-top: 1px solid var(--border);
+    padding: 8px 16px; font-size: 13px; color: var(--muted); min-height: 20px; }
+  #fatal { padding: 32px 20px; text-align: center; color: var(--danger); font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="fatal" hidden>Esta interface precisa ser aberta pelo WebUI do KernelSU (objeto <code>ksu</code> ausente).</div>
+<div id="app" hidden>
+<header>
+  <h1>DeviceID+</h1>
+  <nav class="tabs">
+    <button data-tab="ssaid" class="active">SSAID</button>
+    <button data-tab="props">Props</button>
+    <button data-tab="watcher">Watcher ADB</button>
+    <button data-tab="tricky">TrickyStore</button>
+  </nav>
+</header>
+<main>
+  <section class="tabpage active" id="tab-ssaid">
+    <div class="card">
+      <h2>ID Global</h2>
+      <div class="row">
+        <input type="text" id="global-id" class="mono grow" maxlength="16" placeholder="16 hex" />
+        <button class="btn secondary" id="btn-regen-global">Regenerar</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn grow" id="btn-apply-ssaid">Aplicar</button>
+        <button class="btn secondary" id="btn-backup">Backup</button>
+        <button class="btn secondary" id="btn-restore">Restaurar</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0">Backup em /storage/emulated/0/settings_ssaid.backup.xml. Aplicar exige reinício.</p>
+    </div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="ssaid-search" class="grow" placeholder="Buscar pacote..." />
+        <label class="chk"><input type="checkbox" id="ssaid-3p" checked /> Só 3rd-party</label>
+      </div>
+    </div>
+    <div class="card listbox" id="ssaid-list"><p class="muted">Carregando...</p></div>
+  </section>
+
+  <section class="tabpage" id="tab-props">
+    <div class="card">
+      <label class="chk"><input type="checkbox" id="props-enabled" /> Ativar spoof de props no boot</label>
+    </div>
+    <div class="card">
+      <h2>Propriedades</h2>
+      <div id="props-list"></div>
+      <button class="btn secondary small" id="btn-add-prop" style="margin-top:8px">+ Adicionar prop</button>
+    </div>
+    <div class="card row">
+      <button class="btn grow" id="btn-apply-props">Aplicar agora</button>
+      <button class="btn secondary grow" id="btn-save-props">Salvar</button>
+    </div>
+  </section>
+
+  <section class="tabpage" id="tab-watcher">
+    <div class="card">
+      <label class="chk"><input type="checkbox" id="watcher-enabled" /> Ativar watcher (desliga ADB/Dev quando app monitorado está em foreground)</label>
+    </div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="watcher-search" class="grow" placeholder="Buscar pacote..." />
+        <label class="chk"><input type="checkbox" id="watcher-3p" checked /> Só 3rd-party</label>
+      </div>
+    </div>
+    <div class="card listbox" id="watcher-list"><p class="muted">Carregando...</p></div>
+    <div class="card row">
+      <button class="btn grow" id="btn-save-watcher">Salvar</button>
+    </div>
+  </section>
+
+  <section class="tabpage" id="tab-tricky">
+    <div class="card" id="tricky-body"><p class="muted">Carregando...</p></div>
+  </section>
+</main>
+<div id="statusbar"></div>
+</div>
+
+<div id="modal-wrap" hidden>
+  <div id="modal">
+    <p id="modal-msg"></p>
+    <div class="row">
+      <button class="btn secondary" id="modal-no">Depois</button>
+      <button class="btn danger" id="modal-yes">Reiniciar</button>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
