@@ -1,0 +1,25 @@
+# Conteudo grande, binario publico ou regeneravel — fica no disco, fora do git
+rom/
+backup/
+updates/
+tools/platform-tools/
+tools/shamiko_extracted/
+tools/zn_extracted/
+tools/ts_extracted/
+tools/ksu_apk/
+quarantine/extracted/
+__MACOSX/
+.DS_Store
+*.zip
+*.rar
+*.img
+*.apk
+*.ko
+*.elf
+*.so
+*.dex
+*.jar
+
+# Binarios do device (regeneraveis via releases xxksu) e cookies de sessao
+tools/ksuinit
+*cookies*.txt

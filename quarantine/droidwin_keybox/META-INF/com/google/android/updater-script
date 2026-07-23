@@ -1,0 +1,9 @@
+ui_print("*******************************");
+ui_print("   Droidwin_Keybox Installer   ");
+ui_print("   - By Droidwin -             ");
+ui_print("*******************************");
+ui_print("- Placing Keybox in Tricky Store...");
+# The rest is handled by Magisk boot scripts
+ui_print("- Done!");
+
+#MAGISK

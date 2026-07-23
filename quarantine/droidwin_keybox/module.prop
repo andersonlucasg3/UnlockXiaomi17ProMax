@@ -1,0 +1,6 @@
+id=droidwin_keybox
+name=Droidwin_Keybox
+version=3.4
+versionCode=34
+author=Droidwin
+description=Gives you a new working unrevoked keybox and automatically places it at data/adb/tricky_store.
