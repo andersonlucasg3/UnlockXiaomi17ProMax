@@ -16,5 +16,7 @@ while IFS= read -r line; do
   key=${line%%=*}
   val=${line#*=}
   [ -n "$key" ] || continue
-  ksud resetprop "$key" "$val" 2>/dev/null || resetprop "$key" "$val" 2>/dev/null
+  # Standalone resetprop only: calling "ksud resetprop" from a ksud-run boot
+  # stage re-enters ksud and hangs the stage (bootloop in the field).
+  resetprop "$key" "$val"
 done < "$LIST"
