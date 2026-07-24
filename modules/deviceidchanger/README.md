@@ -7,6 +7,7 @@ Fork de [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), l
 
 - **SSAID manager**: lista todos os pacotes instalados (filtro 3rd-party/todos + busca), mostra o SSAID atual de cada app, permite enrolar apps para spoof com ID global ou ID custom por app (16 hex). Edita `/data/system/users/0/settings_ssaid.xml` via `abx2xml`/`xml2abx`, inserindo entradas novas quando o app ainda não tem SSAID. Backup/restauração em `/storage/emulated/0/settings_ssaid.backup.xml`.
 - **Build props**: lista editável de pares chave=valor aplicados com `ksud resetprop` (imediato via botão e no boot via `post-fs-data.sh`).
+- **Props por app**: spoof de propriedades de sistema visível apenas para apps escolhidos, via biblioteca Zygisk própria (`zygisk/arm64-v8a.so`, fonte em `native/`). A lib carrega em `preAppSpecialize` as entradas do arquivo flat `.perapp_props` (linhas `pkg|chave=valor`, espelhado de `config.json` pela WebUI) e, apenas nos apps configurados, instala hooks de GOT/PLT nas funções bionic `__system_property_get`, `__system_property_read` e `__system_property_read_callback` de todas as imagens ELF carregadas. Apps não configurados recebem `DLCLOSE_MODULE_LIBRARY` (nada fica mapeado). Vale ao reabrir o app — sem reboot. **Atenção**: o app alvo NÃO pode estar marcado em "umount modules" no KernelSU, senão o spoof não chega até ele.
 - **TrickyStore**: visualiza/edita `/data/adb/tricky_store/target.txt` (adicionar/remover pacotes), quando presente.
 
 ## Estrutura
@@ -18,13 +19,29 @@ module/
 ├── post-fs-data.sh   # aplica props spoofadas no boot
 ├── service.sh        # aplica props spoofadas após boot_completed
 ├── config.json       # configuração persistida pela WebUI
+├── zygisk/
+│   └── arm64-v8a.so  # spoof de props por app (fonte em ../native/)
 └── webroot/
     ├── index.html
     └── app.js
 ```
 
-A WebUI espelha `config.json` em arquivos flat (`.props_enabled`, `.props_spoof`)
-para que os scripts de boot não precisem de `jq`.
+A WebUI espelha `config.json` em arquivos flat (`.props_enabled`, `.props_spoof`,
+`.perapp_props`) para que os scripts de boot e a lib zygisk não precisem de `jq`.
+
+## Build da lib nativa
+
+Requer o clang do Termux (aarch64). Gera `module/zygisk/arm64-v8a.so`:
+
+```sh
+cd native && ./build.sh
+```
+
+Teste de fumaça on-device (prova o GOT patching no próprio processo):
+
+```sh
+cd native && ./build.sh test && su -c "$PWD/test_hook"
+```
 
 ## Build
 

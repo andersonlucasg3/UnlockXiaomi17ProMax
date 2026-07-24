@@ -23,3 +23,6 @@ __MACOSX/
 # Binarios do device (regeneraveis via releases xxksu) e cookies de sessao
 tools/ksuinit
 *cookies*.txt
+
+# Binario de teste do componente zygisk (rebuild: native/build.sh test)
+modules/deviceidchanger/native/test_hook

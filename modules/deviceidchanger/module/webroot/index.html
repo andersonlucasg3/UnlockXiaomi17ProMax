@@ -76,6 +76,7 @@
   <nav class="tabs">
     <button data-tab="ssaid" class="active">SSAID</button>
     <button data-tab="props">Props</button>
+    <button data-tab="perapp">Props por app</button>
     <button data-tab="tricky">TrickyStore</button>
   </nav>
 </header>
@@ -115,6 +116,24 @@
     <div class="card row">
       <button class="btn grow" id="btn-apply-props">Aplicar agora</button>
       <button class="btn secondary grow" id="btn-save-props">Salvar</button>
+    </div>
+  </section>
+
+  <section class="tabpage" id="tab-perapp">
+    <div class="card">
+      <label class="chk"><input type="checkbox" id="perapp-enabled" /> Ativar spoof de props por app</label>
+      <p class="muted" style="margin:8px 0 0">As mudanças valem quando o app reabre (não precisa reiniciar o aparelho).
+        O app NÃO pode estar marcado em "umount modules" no KernelSU, senão o spoof não chega até ele.</p>
+    </div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="perapp-search" class="grow" placeholder="Buscar pacote..." />
+        <label class="chk"><input type="checkbox" id="perapp-3p" checked /> Só 3rd-party</label>
+      </div>
+    </div>
+    <div class="card listbox" id="perapp-list"><p class="muted">Carregando...</p></div>
+    <div class="card row">
+      <button class="btn grow" id="btn-apply-perapp">Aplicar</button>
     </div>
   </section>
 

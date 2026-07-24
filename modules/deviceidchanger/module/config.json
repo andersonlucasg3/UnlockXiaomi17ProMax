@@ -1,4 +1,5 @@
 {
   "ssaid": { "globalId": "", "apps": {} },
-  "props": { "enabled": false, "list": [{ "key": "ro.build.host", "value": "c3-miui-ota-bd110" }] }
+  "props": { "enabled": false, "list": [{ "key": "ro.build.host", "value": "c3-miui-ota-bd110" }] },
+  "perapp": { "enabled": false, "apps": {} }
 }

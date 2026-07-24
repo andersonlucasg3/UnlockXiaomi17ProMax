@@ -10,7 +10,8 @@ var TS_TARGET = "/data/adb/tricky_store/target.txt";
 
 var DEFAULT_CONFIG = {
   ssaid: { globalId: "", apps: {} },
-  props: { enabled: false, list: [{ key: "ro.build.host", value: "c3-miui-ota-bd110" }] }
+  props: { enabled: false, list: [{ key: "ro.build.host", value: "c3-miui-ota-bd110" }] },
+  perapp: { enabled: false, apps: {} }
 };
 
 /* Shell script (re)generated on every SSAID apply; written via base64 to avoid
@@ -180,6 +181,22 @@ async function loadConfig() {
       cfg.props.enabled = !!parsed.props.enabled;
       if (Array.isArray(parsed.props.list)) cfg.props.list = parsed.props.list;
     }
+    if (parsed.perapp) {
+      cfg.perapp.enabled = !!parsed.perapp.enabled;
+      if (parsed.perapp.apps && typeof parsed.perapp.apps === "object") {
+        // normalize: keep only arrays of {key, value}
+        cfg.perapp.apps = {};
+        Object.keys(parsed.perapp.apps).forEach(function (pkg) {
+          var arr = parsed.perapp.apps[pkg];
+          if (!Array.isArray(arr)) return;
+          cfg.perapp.apps[pkg] = arr.filter(function (kv) {
+            return kv && typeof kv.key === "string";
+          }).map(function (kv) {
+            return { key: kv.key, value: typeof kv.value === "string" ? kv.value : "" };
+          });
+        });
+      }
+    }
   } catch (e) {
     // missing/corrupt config: keep defaults
   }
@@ -191,6 +208,21 @@ async function saveConfig() {
   await writeFile(MODDIR + "/.props_enabled", cfg.props.enabled ? "1\n" : "0\n");
   await writeFile(MODDIR + "/.props_spoof",
     cfg.props.list.map(function (p) { return p.key + "=" + p.value; }).join("\n") + "\n");
+  // flat mirror for the zygisk lib: "pkg|key=value" per line. Written only when
+  // per-app spoof is enabled; an empty file is the kill switch (config.json
+  // keeps the data so re-enabling restores everything).
+  var perappLines = [];
+  if (cfg.perapp.enabled) {
+    Object.keys(cfg.perapp.apps).sort().forEach(function (pkg) {
+      cfg.perapp.apps[pkg].forEach(function (kv) {
+        if (!kv.key) return;
+        var safeVal = kv.value.replace(/[|\r\n]/g, "");
+        perappLines.push(pkg + "|" + kv.key + "=" + safeVal);
+      });
+    });
+  }
+  await writeFile(MODDIR + "/.perapp_props",
+    perappLines.length ? perappLines.join("\n") + "\n" : "");
 }
 
 // ---------- Packages ----------
@@ -444,6 +476,120 @@ async function saveProps() {
   } catch (e) { toast("Falha ao salvar: " + e.message); }
 }
 
+// ---------- Per-app props tab (zygisk) ----------
+
+var PERAPP_KEY_RE = /^[A-Za-z0-9_.\-]+$/;
+
+function renderPerappList() {
+  document.getElementById("perapp-enabled").checked = cfg.perapp.enabled;
+  var box = document.getElementById("perapp-list");
+  box.innerHTML = "";
+  var third = document.getElementById("perapp-3p").checked;
+  var query = document.getElementById("perapp-search").value;
+  var list = visiblePkgs(third, query);
+  if (!list.length) { box.appendChild(el("p", "muted", "Nenhum pacote.")); return; }
+  list.forEach(function (p) { box.appendChild(buildPerappRow(p)); });
+}
+
+function buildPerappRow(p) {
+  var enrolled = Object.prototype.hasOwnProperty.call(cfg.perapp.apps, p.pkg);
+  var appProps = enrolled ? cfg.perapp.apps[p.pkg] : [];
+
+  var item = el("div", "appitem");
+  var head = el("div", "row");
+  var chk = document.createElement("input");
+  chk.type = "checkbox";
+  chk.checked = enrolled;
+  var labelWrap = el("div", "grow");
+  labelWrap.appendChild(el("div", "pkg", p.pkg));
+  labelWrap.appendChild(el("div", "ssaid" + (enrolled ? "" : " none"),
+    enrolled ? appProps.length + " prop(s)" : "sem spoof"));
+  head.appendChild(chk);
+  head.appendChild(labelWrap);
+  item.appendChild(head);
+
+  var sub = el("div", "sub" + (enrolled ? "" : " hidden"));
+
+  appProps.forEach(function (kv, idx) {
+    var row = el("div", "row");
+    var k = document.createElement("input");
+    k.type = "text"; k.className = "mono grow"; k.placeholder = "chave"; k.value = kv.key;
+    var v = document.createElement("input");
+    v.type = "text"; v.className = "mono grow"; v.placeholder = "valor"; v.value = kv.value;
+    var del = el("button", "btn danger small", "X");
+    k.addEventListener("input", function () { kv.key = k.value.trim(); });
+    v.addEventListener("input", function () { kv.value = v.value.trim(); });
+    del.addEventListener("click", function () {
+      appProps.splice(idx, 1);
+      renderPerappList();
+    });
+    row.appendChild(k); row.appendChild(v); row.appendChild(del);
+    sub.appendChild(row);
+  });
+
+  var btnRow = el("div", "row");
+  var add = el("button", "btn secondary small", "+ Adicionar prop");
+  add.addEventListener("click", function () {
+    appProps.push({ key: "", value: "" });
+    renderPerappList();
+  });
+  var rm = el("button", "btn danger small", "Remover app");
+  rm.addEventListener("click", function () {
+    delete cfg.perapp.apps[p.pkg];
+    renderPerappList();
+  });
+  btnRow.appendChild(add);
+  if (enrolled) btnRow.appendChild(rm);
+  sub.appendChild(btnRow);
+
+  chk.addEventListener("change", function () {
+    if (chk.checked) {
+      if (!appProps.length) appProps.push({ key: "", value: "" });
+      cfg.perapp.apps[p.pkg] = appProps;
+    } else {
+      delete cfg.perapp.apps[p.pkg];
+    }
+    renderPerappList();
+  });
+
+  item.appendChild(sub);
+  return item;
+}
+
+async function applyPerapp() {
+  cfg.perapp.enabled = document.getElementById("perapp-enabled").checked;
+  // drop rows without key, validate the rest
+  var pkgs = Object.keys(cfg.perapp.apps);
+  var i, j;
+  for (i = 0; i < pkgs.length; i++) {
+    var arr = cfg.perapp.apps[pkgs[i]].filter(function (kv) { return kv.key; });
+    for (j = 0; j < arr.length; j++) {
+      if (!PERAPP_KEY_RE.test(arr[j].key)) {
+        toast("Chave inválida (" + pkgs[i] + "): " + arr[j].key);
+        return;
+      }
+    }
+    cfg.perapp.apps[pkgs[i]] = arr;
+  }
+
+  status("Aplicando props por app...");
+  try {
+    await saveConfig();
+    // force-stop so the spoof is picked up when each app reopens
+    var stopped = 0;
+    for (i = 0; i < pkgs.length; i++) {
+      if (!cfg.perapp.apps[pkgs[i]].length) continue;
+      var r = await exec("am force-stop " + pkgs[i]);
+      if (r.errno === 0) stopped++;
+    }
+    status("");
+    toast("Salvo. Spoof vale ao reabrir o app (" + stopped + " app(s) reiniciado(s)); não precisa reboot.");
+  } catch (e) {
+    status("");
+    toast("Falha ao aplicar: " + e.message);
+  }
+}
+
 // ---------- TrickyStore tab ----------
 
 async function renderTricky() {
@@ -531,6 +677,10 @@ async function init() {
   document.getElementById("btn-apply-props").addEventListener("click", applyPropsNow);
   document.getElementById("btn-save-props").addEventListener("click", saveProps);
 
+  document.getElementById("perapp-search").addEventListener("input", renderPerappList);
+  document.getElementById("perapp-3p").addEventListener("change", renderPerappList);
+  document.getElementById("btn-apply-perapp").addEventListener("click", applyPerapp);
+
   document.getElementById("modal-no").addEventListener("click", function () {
     document.getElementById("modal-wrap").hidden = true;
   });
@@ -552,6 +702,7 @@ async function init() {
     toast("Falha ao carregar: " + e.message);
   }
   renderSsaidList();
+  renderPerappList();
 }
 
 if (typeof ksu === "undefined" || typeof ksu.exec !== "function") {
