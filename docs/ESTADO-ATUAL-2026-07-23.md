@@ -1,6 +1,6 @@
-# ESTADO ATUAL DO PROJETO — snapshot 23/jul/2026 ~20h (2ª atualização do dia)
+# ESTADO ATUAL DO PROJETO — snapshot 23/jul/2026 ~22h (3ª atualização do dia)
 
-> Substitui o snapshot de ~14:20. Retomar qualquer frente a partir daqui.
+> Substitui os snapshots anteriores. Retomar qualquer frente a partir daqui.
 
 ## 1. Aparelho e ROM
 
@@ -12,7 +12,7 @@
 ## 2. Root e stack
 
 - **KernelSU LKM** driver **32558** (backslashxx v3.2.5-34) no `init_boot`; manager `me.weishu.kernelsu` 32559, **adb root ON** (funciona também via Wi-Fi: `adb tcpip 5555` → `adb connect <ip>:5555`; não persiste a reboot)
-- **ZygiskNext 1.4.3-817** (enforce-denylist), PIF v17, **TrickyStore v1.4.1** (keybox DroidWin v3.6; target.txt inclui os 3 pacotes Caixa + `br.com.gabba.Caixa` desde hoje)
+- **ZygiskNext 1.4.3-817** (enforce-denylist), PIF v17 **com `custom.pif.prop` = Pixel 10 (frankel, Canary ZP11.260618.005, expira 2026-08-19 — rodar Action do PIF p/ renovar)**, **TrickyStore v1.4.1** (keybox DroidWin v3.6 + security_patch.txt=2026-07-05; target.txt inclui os 3 pacotes Caixa + `br.com.gabba.Caixa`)
 - **Umount global** (exceto gms/vending/termux)
 - **Play Integrity: 3/3 ✅** (verificado hoje)
 
@@ -39,24 +39,39 @@
 
 **Recovery:** TWRP 3.7.1 (variante pinwork_partialdecryption) **mantido** como rede de segurança — foi o que salvou os 2 bootloops.
 
-## 5. Módulo DeviceID+ v2.0.0 (fork — NOVO, hoje)
+- **Recovery:** TWRP 3.7.1 unofficial (variante `fix22ZX_pinwork_partialdecryption`, flasheado hoje) — **mantido como rede de segurança**, decripta /data com PIN
+
+## 5. Frente BYD digital key (EM ANDAMENTO — parada aqui)
+
+**Objetivo:** provisionar a chave digital do BYD (Destroyer 05/King BR) no celular. Erro: "celular não tem o necessário" — **na Wallet/OS, não no app BYD** (confirmado pelo usuário).
+
+**Fatos:**
+- Hardware OK (verificado no device): `nfc.ese` + `nfc.uicc` + OMAPI (`android.hardware.se.omapi.ese.xml`), `android.hardware.uwb`, HAL `secure_element-service.qti` e `com.android.se` rodando
+- BYD Digital Key provisiona via **Google Wallet (Pixel 6+)** ou **Samsung Wallet (S20+)** — Xiaomi não está na lista (fontes: BYD Europe/HK)
+- **Experimento aplicado:** `action.sh` do PIF rodado → gms/vending agora = **Pixel 10 (frankel)** via `/data/adb/modules/playintegrityfix/custom.pif.prop`
+- ⏳ **PRÓXIMO PASSO (usuário):** retentar o provisionamento no carro
+- **Se falhar:** o app Google Wallet (com.google.android.apps.walletnfcrel) **não é injetado pelo PIF** (escopo = gms.unstable + vending) e ainda vê "popsicle" → próximo nível seria injetar o Wallet app (LSPosed JingMatrix ou similar) ou gate server-side de região/conta BYD BR
+- **Rollback do experimento:** apagar `custom.pif.prop` + force-stop gms/vending (PIF volta aos defaults internos que davam PI 3/3)
+- ⚠️ Verificar Play Integrity após o reteste (print novo pode alterar o veredito)
+
+## 6. Módulo DeviceID+ v2.0.0 (fork — instalado e ativo)
 
 - **Local:** `modules/deviceidchanger/` (fork AGPL de sidex15/deviceidchanger, créditos no README/LICENSE)
 - **Zip:** `modules/deviceidchanger/DeviceID-Plus.zip` (rebuild: `build_zip.ps1`)
 - **Features:** SSAID por app (lista todos os pacotes, checkbox enroll, ID global compartilhado OU custom por app, regen de ambos, backup/restore + validação anti-bootloop) · spoof de props persistente (service.sh pós-boot, default `ro.build.host=c3-miui-ota-bd110`) · editor do target.txt do TrickyStore
 - **Instalado e ativo no aparelho** (substituiu o sidex15 original)
 
-## 6. Git/GitHub
+## 7. Git/GitHub
 
-- Branch `main`. Commits: `8c231b3` (baseline), `dcd35aa` (fork do módulo), + reorg (`docs/`, `scripts/{build,analysis,device,flash}`, `config/keybox.xml`)
+- Repo público-privado: `github.com/andersonlucasg3/UnlockXiaomi` (branch `main`, push automático via `gh` autenticado)
+- Últimos commits: `11f01c2` (watcher removido + Caixa resolvida) — ver `git log`
 - `.gitattributes`: `*.sh` sempre LF
-- Pendente: `gh repo create UnlockXiaomi --private --source=. --push` (gh autenticado: andersonlucasg3)
 
-## 7. Resolvido hoje (não reabrir)
+## 8. Resolvido hoje (não reabrir)
 
 - Updater de apps de sistema: usuário **desinstalou o app de update** (era by design, assinatura EU ≠ Xiaomi)
 
-## 8. Regras de ouro (inalteradas)
+## 9. Regras de ouro (inalteradas)
 
 - NUNCA `fastboot flashing lock` · NUNCA editar vbmeta na mão · sempre conferir **POPSICLE** (não PANDORA)
 - `fastboot set_active a|b` (underscore) · adb push/pull via `/storage/emulated/0/...` ou `/data/local/tmp/`
