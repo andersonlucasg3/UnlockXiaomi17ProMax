@@ -7,7 +7,6 @@ Fork de [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), l
 
 - **SSAID manager**: lista todos os pacotes instalados (filtro 3rd-party/todos + busca), mostra o SSAID atual de cada app, permite enrolar apps para spoof com ID global ou ID custom por app (16 hex). Edita `/data/system/users/0/settings_ssaid.xml` via `abx2xml`/`xml2abx`, inserindo entradas novas quando o app ainda não tem SSAID. Backup/restauração em `/storage/emulated/0/settings_ssaid.backup.xml`.
 - **Build props**: lista editável de pares chave=valor aplicados com `ksud resetprop` (imediato via botão e no boot via `post-fs-data.sh`).
-- **Watcher ADB/Dev**: `service.sh` monitora o app em foreground a cada 2s; quando um app monitorado está ativo, desliga `adb_enabled` e `development_settings_enabled`, restaurando ao sair.
 - **TrickyStore**: visualiza/edita `/data/adb/tricky_store/target.txt` (adicionar/remover pacotes), quando presente.
 
 ## Estrutura
@@ -17,15 +16,15 @@ module/
 ├── module.prop
 ├── customize.sh
 ├── post-fs-data.sh   # aplica props spoofadas no boot
-├── service.sh        # loop do watcher ADB/Dev
+├── service.sh        # aplica props spoofadas após boot_completed
 ├── config.json       # configuração persistida pela WebUI
 └── webroot/
     ├── index.html
     └── app.js
 ```
 
-A WebUI espelha `config.json` em arquivos flat (`.props_enabled`, `.props_spoof`,
-`.watcher_enabled`, `.watcher_packages`) para que os scripts de boot não precisem de `jq`.
+A WebUI espelha `config.json` em arquivos flat (`.props_enabled`, `.props_spoof`)
+para que os scripts de boot não precisem de `jq`.
 
 ## Build
 

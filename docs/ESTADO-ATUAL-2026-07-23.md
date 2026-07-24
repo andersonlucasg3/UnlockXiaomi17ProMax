@@ -22,39 +22,29 @@
 |---|---|
 | Google Wallet | ✅ |
 | BYD | ✅ |
-| **Caixa / bancos BR** | ❌ **em investigação — frente pausada 23/jul ~19h** (usuário avaliando usar outro celular) |
+| **Caixa / bancos BR** | ✅ **RESOLVIDA 23/jul ~21h** (ver seção 4) |
 | Revolut | ❌ postergado (alavanca: SuSFS) |
 
-## 4. Frente Caixa — o que foi provado e descartado (23/jul tarde)
+## 4. Frente Caixa — RESOLVIDA (23/jul ~21h)
 
-**Descartado em campo (não é nada disso):**
-- SSAID — os 3 apps Caixa receberam **ID compartilhado** `08c406642b2f299d` (apply manual via abx2xml/xml2abx, persistiu pós-reboot)
-- ADB/dev ligado — testado com chave mestra do dev desligada
-- Mounts/maps vazando — mountinfo e maps do processo Caixa 100% limpos
-- Props clássicas — user/release-keys, ro.debuggable=0, ro.secure=1, SELinux Enforcing
-- `/system/bin/su` — **invisível para apps** (KSU virtualiza só para UIDs autorizados; uid 2000 recebe ENOENT)
-- Enumeração de pacotes — QUERY_ALL_PACKAGES revogado pelo usuário + testes
-- Gabba fora do TrickyStore — adicionado ao target.txt
-- **`ro.build.host=xiaomi.eu`** — spoofado nos DOIS níveis (resetprop em memória + bind-mount de `/system/build.prop`, propagado e confirmado visível no processo da Caixa) → **mesma mensagem**
+**Combinação que destravou:** SSAID compartilhado nos 3 apps + `br.com.gabba.Caixa` no target.txt do TrickyStore + spoof persistente `ro.build.host=c3-miui-ota-bd110` (service.sh em boot_completed+5s) + ADB/dev desligado ao usar o app (manual).
 
-**Engenharia reversa (APKs analisados; relatório descartado, conclusões aqui):**
-- Detector = SDK **CashShield** (`libcashshieldptr-native-lib.so`, presente no superapp E no Gabba). Superfície: paths de root/xposed, props (ro.build.host/tags/debuggable/service.adb.root), Frida/hooks, `which su`, coleta MediaDRM ID + GAID + AndroidID → **veredito provavelmente server-side**
-- Gabba (`br.com.gabba.Caixa`, instalado hoje 10:13) = app-companheiro de segurança; OpenCV pra captura de documentos; iProov/Oz Forensics = liveness anti-fraude (daí as queries de câmera virtual no manifest)
-- App é React Native/Expo com Module Federation (@caixasuperapp/sdk)
+**Detector identificado (engenharia reversa):** SDK **CashShield** (`libcashshieldptr-native-lib.so`, presente no superapp E no Gabba) — paths de root/xposed, props (ro.build.host/tags/debuggable/service.adb.root), Frida/hooks, `which su`, coleta MediaDRM/GAID/AndroidID → veredito server-side. App = React Native/Expo (Module Federation). Gabba = app-companheiro de segurança (OpenCV p/ documentos, iProov/Oz p/ liveness).
 
-**Hipóteses abertas (ordem de retomada):**
-1. **Caixa está no umount do KSU = sem injeção Zygisk** → TrickyStore não intercepta key attestation no processo dela → unlocked exposto ao backend. **Teste:** tirar os 3 apps Caixa do umount no manager KSU + retestar
-2. Bind server-side em **MediaDRM ID / GAID / Firebase Installation ID**. **Teste:** reset GAID (Config → Google → Anúncios) + clear data dos apps Caixa
-3. Marcação na conta no servidor do banco → re-registro/atendimento
+**Licões dos 2 bootloops (fixes no módulo, commits `67a508b`/`7b961c4`):**
+1. `settings_ssaid.xml` tem `<namespaceHashes/>` APÓS `</settings>` — qualquer edição que remova/re-adicione o closing tag o engole pra dentro de `<settings>` → system_server morre → bootloop. Apply do módulo agora insere via awk antes do closing tag + backup automático + validação pós-encode com restore.
+2. `resetprop` no post-fs-data REAL bootloopeia (ao vivo com sistema de pé funciona) — spoof roda em service.sh após boot_completed.
 
-**Rollback SSAID:** backup binário em `/data/local/tmp/settings_ssaid.bak` (device) e `backup/settings_ssaid-pre-randomize.xml` (PC).
+**Watcher ADB/Dev:** REMOVIDO do módulo a pedido do usuário (bateria + janela de detecção no lançamento é imbatível por polling). ADB/dev = controle manual. Histerese implementada e descartada está no histórico git (`98315b3`).
+
+**Recovery:** TWRP 3.7.1 (variante pinwork_partialdecryption) **mantido** como rede de segurança — foi o que salvou os 2 bootloops.
 
 ## 5. Módulo DeviceID+ v2.0.0 (fork — NOVO, hoje)
 
 - **Local:** `modules/deviceidchanger/` (fork AGPL de sidex15/deviceidchanger, créditos no README/LICENSE)
 - **Zip:** `modules/deviceidchanger/DeviceID-Plus.zip` (rebuild: `build_zip.ps1`)
-- **Features:** SSAID por app (lista todos os pacotes, checkbox enroll, ID global compartilhado OU custom por app, regen de ambos, backup/restore) · spoof de props no boot (`ksud resetprop`, default `ro.build.host=c3-miui-ota-bd110`) · watcher ADB/Dev (desliga ADB/dev com app monitorado em foreground, **restaura estado anterior** ao sair) · editor do target.txt do TrickyStore
-- **Instalação pendente:** `ksud module install` — ⚠️ usa o mesmo id `deviceidchanger` do módulo original (instalação **substitui** o sidex15)
+- **Features:** SSAID por app (lista todos os pacotes, checkbox enroll, ID global compartilhado OU custom por app, regen de ambos, backup/restore + validação anti-bootloop) · spoof de props persistente (service.sh pós-boot, default `ro.build.host=c3-miui-ota-bd110`) · editor do target.txt do TrickyStore
+- **Instalado e ativo no aparelho** (substituiu o sidex15 original)
 
 ## 6. Git/GitHub
 

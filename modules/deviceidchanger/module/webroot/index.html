@@ -76,7 +76,6 @@
   <nav class="tabs">
     <button data-tab="ssaid" class="active">SSAID</button>
     <button data-tab="props">Props</button>
-    <button data-tab="watcher">Watcher ADB</button>
     <button data-tab="tricky">TrickyStore</button>
   </nav>
 </header>
@@ -116,22 +115,6 @@
     <div class="card row">
       <button class="btn grow" id="btn-apply-props">Aplicar agora</button>
       <button class="btn secondary grow" id="btn-save-props">Salvar</button>
-    </div>
-  </section>
-
-  <section class="tabpage" id="tab-watcher">
-    <div class="card">
-      <label class="chk"><input type="checkbox" id="watcher-enabled" /> Ativar watcher (desliga ADB/Dev quando app monitorado está em foreground)</label>
-    </div>
-    <div class="card">
-      <div class="row">
-        <input type="search" id="watcher-search" class="grow" placeholder="Buscar pacote..." />
-        <label class="chk"><input type="checkbox" id="watcher-3p" checked /> Só 3rd-party</label>
-      </div>
-    </div>
-    <div class="card listbox" id="watcher-list"><p class="muted">Carregando...</p></div>
-    <div class="card row">
-      <button class="btn grow" id="btn-save-watcher">Salvar</button>
     </div>
   </section>
 

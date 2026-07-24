@@ -10,8 +10,7 @@ var TS_TARGET = "/data/adb/tricky_store/target.txt";
 
 var DEFAULT_CONFIG = {
   ssaid: { globalId: "", apps: {} },
-  props: { enabled: false, list: [{ key: "ro.build.host", value: "c3-miui-ota-bd110" }] },
-  watcher: { enabled: false, packages: [] }
+  props: { enabled: false, list: [{ key: "ro.build.host", value: "c3-miui-ota-bd110" }] }
 };
 
 /* Shell script (re)generated on every SSAID apply; written via base64 to avoid
@@ -181,10 +180,6 @@ async function loadConfig() {
       cfg.props.enabled = !!parsed.props.enabled;
       if (Array.isArray(parsed.props.list)) cfg.props.list = parsed.props.list;
     }
-    if (parsed.watcher) {
-      cfg.watcher.enabled = !!parsed.watcher.enabled;
-      if (Array.isArray(parsed.watcher.packages)) cfg.watcher.packages = parsed.watcher.packages;
-    }
   } catch (e) {
     // missing/corrupt config: keep defaults
   }
@@ -196,8 +191,6 @@ async function saveConfig() {
   await writeFile(MODDIR + "/.props_enabled", cfg.props.enabled ? "1\n" : "0\n");
   await writeFile(MODDIR + "/.props_spoof",
     cfg.props.list.map(function (p) { return p.key + "=" + p.value; }).join("\n") + "\n");
-  await writeFile(MODDIR + "/.watcher_enabled", cfg.watcher.enabled ? "1\n" : "0\n");
-  await writeFile(MODDIR + "/.watcher_packages", cfg.watcher.packages.join("\n") + "\n");
 }
 
 // ---------- Packages ----------
@@ -451,41 +444,6 @@ async function saveProps() {
   } catch (e) { toast("Falha ao salvar: " + e.message); }
 }
 
-// ---------- Watcher tab ----------
-
-function renderWatcherList() {
-  var box = document.getElementById("watcher-list");
-  box.innerHTML = "";
-  var third = document.getElementById("watcher-3p").checked;
-  var query = document.getElementById("watcher-search").value;
-  var list = visiblePkgs(third, query);
-  if (!list.length) { box.appendChild(el("p", "muted", "Nenhum pacote.")); return; }
-  list.forEach(function (p) {
-    var row = el("div", "appitem");
-    var lab = el("label", "chk");
-    var chk = document.createElement("input");
-    chk.type = "checkbox";
-    chk.checked = cfg.watcher.packages.indexOf(p.pkg) !== -1;
-    chk.addEventListener("change", function () {
-      var i = cfg.watcher.packages.indexOf(p.pkg);
-      if (chk.checked && i === -1) cfg.watcher.packages.push(p.pkg);
-      if (!chk.checked && i !== -1) cfg.watcher.packages.splice(i, 1);
-    });
-    lab.appendChild(chk);
-    lab.appendChild(el("span", "pkg", p.pkg));
-    row.appendChild(lab);
-    box.appendChild(row);
-  });
-}
-
-async function saveWatcher() {
-  cfg.watcher.enabled = document.getElementById("watcher-enabled").checked;
-  try {
-    await saveConfig();
-    toast("Watcher salvo. Ativo no próximo boot (service.sh).");
-  } catch (e) { toast("Falha ao salvar: " + e.message); }
-}
-
 // ---------- TrickyStore tab ----------
 
 async function renderTricky() {
@@ -573,10 +531,6 @@ async function init() {
   document.getElementById("btn-apply-props").addEventListener("click", applyPropsNow);
   document.getElementById("btn-save-props").addEventListener("click", saveProps);
 
-  document.getElementById("watcher-search").addEventListener("input", renderWatcherList);
-  document.getElementById("watcher-3p").addEventListener("change", renderWatcherList);
-  document.getElementById("btn-save-watcher").addEventListener("click", saveWatcher);
-
   document.getElementById("modal-no").addEventListener("click", function () {
     document.getElementById("modal-wrap").hidden = true;
   });
@@ -586,7 +540,6 @@ async function init() {
 
   await loadConfig();
   document.getElementById("global-id").value = cfg.ssaid.globalId || randHex(16);
-  document.getElementById("watcher-enabled").checked = cfg.watcher.enabled;
   renderProps();
 
   status("Carregando pacotes e SSAIDs...");
@@ -599,7 +552,6 @@ async function init() {
     toast("Falha ao carregar: " + e.message);
   }
   renderSsaidList();
-  renderWatcherList();
 }
 
 if (typeof ksu === "undefined" || typeof ksu.exec !== "function") {
