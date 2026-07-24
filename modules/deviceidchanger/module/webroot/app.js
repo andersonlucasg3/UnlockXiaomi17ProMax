@@ -283,8 +283,15 @@ function renderSsaidList() {
   var box = document.getElementById("ssaid-list");
   box.innerHTML = "";
   var third = document.getElementById("ssaid-3p").checked;
-  var query = document.getElementById("ssaid-search").value;
+  var query = (document.getElementById("ssaid-search").value || "").toLowerCase();
   var list = visiblePkgs(third, query);
+  // Enrolled apps that were uninstalled stay listed (marked "desinstalado")
+  // so they can be unchecked; pm list packages no longer returns them.
+  var stale = Object.keys(cfg.ssaid.apps).filter(function (pkg) {
+    if (uidOf(pkg)) return false;
+    return !query || pkg.toLowerCase().indexOf(query) !== -1;
+  }).sort().map(function (pkg) { return { pkg: pkg, uid: "" }; });
+  list = stale.concat(list);
   if (!list.length) { box.appendChild(el("p", "muted", "Nenhum pacote.")); return; }
   list.forEach(function (p) { box.appendChild(buildSsaidRow(p)); });
 }
@@ -300,8 +307,12 @@ function buildSsaidRow(p) {
   chk.checked = enrolled;
   var labelWrap = el("div", "grow");
   labelWrap.appendChild(el("div", "pkg", p.pkg));
-  var cur = ssaidMap[p.pkg];
-  labelWrap.appendChild(el("div", "ssaid" + (cur ? "" : " none"), cur || "sem SSAID"));
+  if (uidOf(p.pkg)) {
+    var cur = ssaidMap[p.pkg];
+    labelWrap.appendChild(el("div", "ssaid" + (cur ? "" : " none"), cur || "sem SSAID"));
+  } else {
+    labelWrap.appendChild(el("div", "ssaid none", "desinstalado"));
+  }
   head.appendChild(chk);
   head.appendChild(labelWrap);
   item.appendChild(head);
@@ -354,8 +365,25 @@ function buildSsaidRow(p) {
 
 async function applySsaid() {
   var globalId = document.getElementById("global-id").value.trim();
+  // Prune enrolled apps that are no longer installed: uidOf() only resolves
+  // via `pm list packages`, so a stale entry would abort every apply with
+  // "UID não encontrado" — and the app is invisible in the list, so it could
+  // never be unchecked either.
+  var stale = [];
+  Object.keys(cfg.ssaid.apps).forEach(function (p) {
+    if (!uidOf(p)) { stale.push(p); delete cfg.ssaid.apps[p]; }
+  });
+  if (stale.length) toast("Removidos (desinstalados): " + stale.join(", "));
   var enrolled = Object.keys(cfg.ssaid.apps);
-  if (!enrolled.length) { toast("Nenhum app selecionado."); return; }
+  if (!enrolled.length) {
+    if (stale.length) {
+      // persist the prune even with nothing left to apply
+      try { await saveConfig(); renderSsaidList(); } catch (e) { /* keep toast */ }
+    } else {
+      toast("Nenhum app selecionado.");
+    }
+    return;
+  }
   var needsGlobal = enrolled.some(function (p) { return cfg.ssaid.apps[p].mode !== "custom"; });
   if (needsGlobal && !isHex16(globalId)) { toast("ID Global inválido (16 hex minúsculo)."); return; }
   var i, p, c;
@@ -371,9 +399,7 @@ async function applySsaid() {
   for (i = 0; i < enrolled.length; i++) {
     p = enrolled[i];
     c = cfg.ssaid.apps[p];
-    var uid = uidOf(p);
-    if (!uid) { toast("UID não encontrado: " + p); return; }
-    lines.push(p + " " + uid + " " + (c.mode === "custom" ? c.id : globalId));
+    lines.push(p + " " + uidOf(p) + " " + (c.mode === "custom" ? c.id : globalId));
   }
 
   status("Aplicando SSAID...");
