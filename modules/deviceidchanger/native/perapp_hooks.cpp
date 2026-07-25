@@ -70,6 +70,16 @@ int perapp_count(void) {
     return g_count;
 }
 
+const char *perapp_key_at(int idx) {
+    if (idx < 0 || idx >= g_count) return NULL;
+    return g_table[idx].key;
+}
+
+const char *perapp_value_at(int idx) {
+    if (idx < 0 || idx >= g_count) return NULL;
+    return g_table[idx].value;
+}
+
 /* Tiny linear scan, allocation-free; NULL when the key is not spoofed. */
 static const char *perapp_lookup(const char *key) {
     if (!key) return NULL;
@@ -101,11 +111,38 @@ static get_fn orig_get = NULL;
 static read_cb_fn orig_read_callback = NULL;
 static read_fn orig_read = NULL;
 
+/* Temporary diagnostics (petal maps investigation): trace prop queries whose
+ * key looks device-identity related, so we can see exactly which keys the app
+ * reads and via which bionic entry point. The filter keeps log volume low AND
+ * avoids the liblog reentrancy trap: __android_log_print internally reads
+ * log.tag.* props, which come back through our hooks — logging every query
+ * recurses until the stack blows (observed). log.tag.* never matches the
+ * filter below, so no recursion is possible.
+ *
+ * NOTE: do NOT add __system_property_find as a hook target and do NOT use
+ * __thread/TLS here — both variants SIGILL under ZygiskNext's custom loader
+ * (jump into the padding below .text), though they run fine under the system
+ * linker (test_hook). */
+#define PERAPP_TRACE 1
+static int trace_key_matches(const char *name) {
+    if (!PERAPP_TRACE || !name) return 0;
+    return strstr(name, "manufacturer") || strstr(name, "brand") ||
+           strstr(name, "huawei") || strstr(name, "HUAWEI") ||
+           strstr(name, "ro.product") || strstr(name, "ro.build");
+}
+#define LOGT(...) do { __android_log_print(ANDROID_LOG_INFO, "DIDPTrace", \
+    __VA_ARGS__); } while (0)
+
 // ---------- replacements ----------
 
 static int my___system_property_get(const char *name, char *value) {
     const char *spoof = perapp_lookup(name);
-    if (spoof) return (int) copy_value(value, PROP_VALUE_MAX, spoof);
+    if (trace_key_matches(name))
+        LOGT("get: %s%s", name, spoof ? " [SPOOF]" : "");
+    if (spoof) {
+        LOGI("spoof applied (get): %s=%s", name, spoof);
+        return (int) copy_value(value, PROP_VALUE_MAX, spoof);
+    }
     if (orig_get) return orig_get(name, value);
     if (value) value[0] = '\0';
     return 0;
@@ -117,12 +154,18 @@ static void my___system_property_read_callback(
         void *cookie) {
     if (pi && orig_read && orig_read_callback) {
         /* Derive the prop name via the saved original __system_property_read
-         * (__system_property_get_name is not exported on modern bionic). */
+         * (__system_property_get_name is not exported on modern bionic).
+         * NOTE: __system_property_read returns the VALUE LENGTH (>= 0), not
+         * 0-on-success — an `== 0` check here silently skipped every spoof
+         * for props with a non-empty real value (bug found on A16). */
         char name[512];
         char val[PROP_VALUE_MAX];
-        if (orig_read(pi, name, val) == 0) {
+        if (orig_read(pi, name, val) >= 0) {
             const char *spoof = perapp_lookup(name);
+            if (trace_key_matches(name))
+                LOGT("read_callback: %s%s", name, spoof ? " [SPOOF]" : "");
             if (spoof) {
+                LOGI("spoof applied (read_callback): %s=%s", name, spoof);
                 if (callback) callback(cookie, name, spoof, 0);
                 return;
             }
@@ -133,13 +176,20 @@ static void my___system_property_read_callback(
 
 static int my___system_property_read(const prop_info *pi, char *name, char *value) {
     if (!orig_read) return 0;
-    /* Fill the real data first, then overwrite the value when spoofed. */
+    /* Fill the real data first, then overwrite the value when spoofed.
+     * rc is the VALUE LENGTH (>= 0 on success). */
     char tmpname[512];
     int rc = orig_read(pi, tmpname, value);
-    if (rc == 0) {
+    if (rc >= 0) {
         if (name) copy_value(name, PROP_NAME_MAX, tmpname);
         const char *spoof = perapp_lookup(tmpname);
-        if (spoof && value) copy_value(value, PROP_VALUE_MAX, spoof);
+        if (trace_key_matches(tmpname))
+            LOGT("read: %s%s", tmpname, spoof ? " [SPOOF]" : "");
+        if (spoof && value) {
+            size_t slen = copy_value(value, PROP_VALUE_MAX, spoof);
+            LOGI("spoof applied (read): %s=%s", tmpname, spoof);
+            return (int) slen; /* callers use the return as the value length */
+        }
     }
     return rc;
 }
@@ -214,6 +264,10 @@ static void patch_slot(uintptr_t slot_addr, const struct hook_target *t, long pa
     }
     *slot = t->replacement;
     mprotect((void *) page_start, len, orig_prot);
+#ifdef PERAPP_VERBOSE_PATCH
+    __android_log_print(ANDROID_LOG_INFO, "ISPX", "patch_slot: %s @%p old=%p new=%p readback=%p",
+                        t->sym, (void *) slot_addr, cur, t->replacement, *slot);
+#endif
     g_stats.patched++;
 }
 
@@ -285,6 +339,7 @@ static int phdr_cb(struct dl_phdr_info *info, size_t, void *data) {
     }
     if (!symtab || !strtab || !strsz) return 0;
 
+    int before = g_stats.patched;
     /* .rela.plt (expect DT_RELA entries; bail out on unexpected DT_REL) */
     if (jmprel && pltrelsz && pltrel == DT_RELA) {
         scan_reloc_table(info->dlpi_addr, jmprel, pltrelsz, symtab, strtab, strsz,
@@ -295,6 +350,9 @@ static int phdr_cb(struct dl_phdr_info *info, size_t, void *data) {
         scan_reloc_table(info->dlpi_addr, rela, relasz, symtab, strtab, strsz,
                          ctx->targets, ctx->ntargets, ctx->page_size);
     }
+    if (g_stats.patched > before)
+        LOGI("patched %d slot(s) in %s", g_stats.patched - before,
+             info->dlpi_name && info->dlpi_name[0] ? info->dlpi_name : "(main)");
     return 0;
 }
 

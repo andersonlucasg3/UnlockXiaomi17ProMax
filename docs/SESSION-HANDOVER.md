@@ -1,9 +1,9 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Documento vivo de continuidade entre sessões. Última atualização: 24/jul/2026 (pós-Sessão 7 — BYD research + Petal Maps). Unifica os antigos `SESSION-HANDOVER-2026-07-23.md` e `ESTADO-ATUAL-2026-07-23.md`. Histórico cronológico detalhado das sessões de 21–22/jul: `docs/relatorio-sessao-2026-07-22.md`.**
+**Documento vivo de continuidade entre sessões. Última atualização: 24/jul/2026 ~23:45 (pós-Sessão 9 — Petal RESOLVIDA, frente BYD/DCK encerrada com mapa completo, DeviceID+ v2.1.1 instalada + spoof Build.* JNI). Unifica os antigos `SESSION-HANDOVER-2026-07-23.md` e `ESTADO-ATUAL-2026-07-23.md`. Histórico cronológico detalhado das sessões de 21–22/jul: `docs/relatorio-sessao-2026-07-22.md`.**
 
 ---
 
-## PARTE 1 — ESTADO ATUAL (snapshot 24/jul/2026 ~14h)
+## PARTE 1 — ESTADO ATUAL (snapshot 24/jul/2026 ~23:45)
 
 ### 1.1 Aparelho e ROM
 - **Device:** Xiaomi 17 Pro Max (`popsicle`, 2509FPN0BC), SD 8 Elite Gen 5, Android 16 (SDK 36)
@@ -13,12 +13,13 @@
 - **Recovery:** TWRP 3.7.1 unofficial (variante `fix22ZX_pinwork_partialdecryption`) — mantido como rede de segurança, decripta /data com PIN (foi o que salvou os 2 bootloops da frente Caixa)
 
 ### 1.2 Root e stack
-- **KernelSU LKM** driver **32558** (backslashxx v3.2.5-34) no `init_boot`; manager `me.weishu.kernelsu` 32559, **adb root ON** (funciona também via Wi-Fi: `adb tcpip 5555` → `adb connect <ip>:5555`; não persiste a reboot)
-- **ZygiskNext 1.4.3-817** (enforce-denylist; `modules64: deviceidchanger, COPG, playintegrityfix`)
+- **KernelSU LKM** driver **32558** (backslashxx) no `init_boot`; manager `me.weishu.kernelsu` **32562 (v3.2.4-36)** — atualizado em 24/jul via `pm install` do APK do release backslashxx (em `tools/ksu_apk/`), **adb root ON** (funciona também via Wi-Fi: `adb tcpip 5555` → `adb connect <ip>:5555`; não persiste a reboot)
+- **ZygiskNext 1.4.3-817** (enforce-denylist; `modules64: deviceidchanger, playintegrityfix`)
+- **USAP pool DESATIVADO** (fatos 19/20): `device_config put runtime_native usap_pool_enabled false` (persiste) + `persist.sys.usap_pool_enabled=false` + `setprop dalvik.vm.usap_pool_enabled false` (volátil). **Frente Petal fechada 24/jul — reativação é decisão em aberto** (risco: injeção ZN flaky volta; requer reboot)
 - **PlayIntegrityFork v17** com `custom.pif.prop` = **Pixel 10 (frankel, Canary ZP11.260618.005 — expira 2026-08-19, rodar Action do PIF p/ renovar)**
 - **TrickyStore v1.4.1** (keybox DroidWin v3.6 + security_patch.txt=2026-07-05; target.txt inclui os 3 pacotes Caixa + `br.com.gabba.Caixa`)
-- **Umount global** (exceto gms/vending/termux **e agora `com.huawei.maps.app`** — ver Parte 5, fato 16)
-- **COPG 5.9.0** (zygisk, AlirezaParsi/COPG) instalado em 24/jul — perfil `HUAWEI_MATE_60_PRO` (Build.* Huawei) aplicado a `com.huawei.maps.app`. **Candidato a remoção** quando a frente Petal fechar (era cinto-e-suspensório; cobre só Build.* no tier free)
+- **Umount global** (exceto gms/vending/termux **e `com.huawei.maps.app`** — ver Parte 5, fato 16). **App BYD:** umount foi desligado na Sessão 9 p/ injeção (frente DCK) — re-ligar no manager se ainda não foi
+- **COPG 5.9.0** — **REMOVIDO pelo usuário em 24/jul** (DeviceID+ COW cobre o caso Petal; era cinto-e-suspensório)
 - **Play Integrity: 3/3 ✅**
 
 ### 1.3 Apps
@@ -28,13 +29,14 @@
 | BYD | ✅ |
 | Caixa / bancos BR | ✅ **RESOLVIDA 23/jul ~21h** (Parte 3) |
 | Revolut | ❌ postergado (alavanca: SuSFS — Parte 2.4) |
-| **Petal Maps 4.7.0.319** | ❌ **EM ABERTO** — bloqueio "only available for Huawei devices" persiste (Parte 2.2) |
+| **Petal Maps 4.7.0.319** | ✅ **RESOLVIDA 24/jul ~18:20** — COW prop_area validado: `Get Manufacturer: HUAWEI`, app passa do gate (Parte 2.2) |
 
 ### 1.4 Módulo DeviceID+ (fork próprio)
-- **Local:** `modules/deviceidchanger/` (fork AGPL de sidex15/deviceidchanger, créditos no README/LICENSE). Rebuild do zip: `native/build.sh` (o `.so`) + zip da pasta `module/` (zip gitignored; `build_zip.ps1` no Windows)
-- **Versões:** v2.1.0 **instalada no aparelho**; **v2.1.1 no repo** (fix: app desinstalado bloqueava todo apply de SSAID — prune automático + listagem de desinstalados; commit `4a9f8f0`), zip rebuildado em `modules/deviceidchanger/DeviceID-Plus.zip` (gitignored), **pendente de instalação**
-- **Features:** SSAID por app (lista todos os pacotes, checkbox enroll, ID global compartilhado OU custom por app, regen de ambos, backup/restore + validação anti-bootloop) · spoof de props persistente global (service.sh pós-boot, `ro.build.host=c3-miui-ota-bd110`) · **spoof de props por app via lib zygisk própria** (hook GOT de `__system_property_get/read/read_callback` em todos os ELF carregados; config flat `.perapp_props` linhas `pkg|chave=valor`; aplica com force-stop do app, sem reboot; stealth unload nos apps não-alvo) · editor do target.txt do TrickyStore
+- **Local:** `modules/deviceidchanger/` (fork AGPL de sidex15/deviceidchanger, créditos no README/LICENSE). Rebuild do zip: `native/build.sh` (o `.so`) + zip da pasta `module/` (zip gitignored; `build_zip.ps1` no Windows). Targets do build.sh: sem arg = módulo; `test` = smoke test `test_hook`; `inspect` = inspetor standalone em /data/local/tmp
+- **Versões:** v2.1.1 **instalada no aparelho 24/jul ~18:17** (zip rebuildado **com o `.so` COW incluído** — o zip antigo não tinha o `.so` e teria removido o spoof no update; o `.so` deployado foi puxado do device p/ `module/zygisk/arm64-v8a.so` antes do rebuild) + config viva re-mesclada no staged. **Native v2.2.0-dev: COW do prop_area VALIDADO 24/jul ~18:20 (Petal) + spoof `Build.*` via JNI adicionado e deployado às ~19:50 (hash `06dcaf4c…`)** — validado em campo no gms/app BYD (frente DCK) e no Petal (23:21). Pendente: bump v2.2.0 + commit do native (prop_cow.cpp, Build.* JNI etc., ainda uncommitted)
+- **Features:** SSAID por app (lista todos os pacotes, checkbox enroll, ID global compartilhado OU custom por app, regen de ambos, backup/restore + validação anti-bootloop) · spoof de props persistente global (service.sh pós-boot, `ro.build.host=c3-miui-ota-bd110`) · **spoof de props por app** — três mecanismos complementares: (1) **COW do prop_area** (`prop_cow.cpp`: copia as páginas da prop p/ mapping privado e reescreve o valor in-place com o protocolo de serial da bionic — cobre TODOS os caminhos de leitura: JNI, nativo, parse direto, static-linked); (2) GOT/PLT hook das 3 funções bionic (`perapp_hooks.cpp`, complemento p/ leitores dinâmicos); (3) **spoof de `android.os.Build.*` via JNI** (`deviceid_zygisk.cpp`: reescreve os campos estáticos MODEL/DEVICE/PRODUCT/BRAND/MANUFACTURER/etc. no processo do app em postSpecialize — necessário porque a classe Build é inicializada no zygote com os valores reais e nem COW nem hooks a alcançam; mesma técnica do PIF). Config flat `.perapp_props` linhas `pkg|chave=valor` — **match por NOME DE PROCESSO (nice_name), não pacote** (fato 25); aplica com force-stop do app, sem reboot; stealth unload nos apps não-alvo · editor do target.txt do TrickyStore
 - **⚠️ Update de módulo KSU sobrescreve o dir inteiro** (`/data/adb/modules/deviceidchanger/`) → sempre re-mesclar `config.json` + `.props_*` + `.perapp_props` no staged (`/data/adb/modules_update/...`) antes do reboot
+- **⚠️ NUNCA trocar o `.so` zygisk a quente** — o ZN cacheia o entry offset no zygote; trocar o arquivo sem reboot faz todo app injetado crashar (fato 20)
 
 ### 1.5 Rollback e recuperação
 | Item | Caminho | sha256 |
@@ -54,8 +56,8 @@
 
 ## PARTE 2 — PENDÊNCIAS
 
-### 2.1 BYD digital key (EM ANDAMENTO — frente ativa)
-**Objetivo:** provisionar a chave digital do BYD (Destroyer 05/King BR) no celular. Erro: "celular não tem o necessário" — **na Wallet/OS, não no app BYD** (confirmado pelo usuário).
+### 2.1 BYD digital key (⏸️ ENCERRADA 24/jul ~23:30 — esgotado client-side; veredito: gate do Google sem workaround conhecido)
+**Objetivo:** provisionar a chave digital do BYD (Destroyer 05/King BR) no celular. **Estado final: bloqueio no `downloadAllowed` do DCK do GMS — GMS de produção não aplica overrides de phenotype por nenhum canal (todos testados); servidor não serve config DCK p/ o modelo. Reversão completa feita** (ver fim da Sessão 9). Legado que fica: DeviceID+ com spoof de `Build.*` (JNI), prop `ro.gms.dck.eligible_wcc` documentada, e todo o mapa do DCK abaixo. Se um dia o Google whitelistar o modelo, retomar daqui.
 
 **Fatos (device):**
 - Hardware OK (verificado no device): `nfc.ese` + `nfc.uicc` + OMAPI (`android.hardware.se.omapi.ese.xml`), `android.hardware.uwb`, HAL `secure_element-service.qti` e `com.android.se` rodando
@@ -72,34 +74,60 @@
 - **Spoof PIF p/ Pixel 10 não resolve**: injeta Build.* só no DroidGuard/attestation; a elegibilidade de car key é decidida server-side contra o modelo real que o GMS reporta.
 - **Nenhum workaround documentado** (LSPosed/spoof de props) com sucesso comprovado para car key — território novo.
 - Risco mesmo se provisionar: revogação silenciosa da chave em re-checks de integridade (caso BMW + Xiaomi 15).
-- ⏳ **PRÓXIMOS PASSOS:** (1) usuário retenta no carro; (2) se falhar, capturar **logcat durante a tentativa** pra identificar se a checagem é local ou server-side; (3) se local, injetar gms/wallet com spoof de modelo — **a infra per-app do DeviceID+ v2.1.0 agora existe pra isso**; (4) em paralelo, feedback à Xiaomi (destravou outros modelos).
+- **Via Samsung Wallet DESCARTADA (pesquisa 24/jul, 3 agentes):** Samsung Wallet exige hardware Galaxy + framework One UI + conta Samsung validada server-side (rejeita não-Samsung desde 2022, "ID not valid"); chave digital Samsung vive no eSE Galaxy com attestation Knox (SAK único por aparelho no TrustZone, vinculado a IMEI+serial — NÃO existe keybox de lote estilo TrickyStore p/ Samsung); KnoxPatch (estado da arte, só hardware Samsung) marca Wallet/Pay como ❌ ("checks rodam no TEE, trustlets assinados — só exploit de TrustZone"); compartilhamento de chave de um Galaxy p/ o Xiaomi falha (destinatário também é checado server-side). Fontes: github.com/salvogiangri/KnoxPatch (+issue #43), docs.samsungknox.com/dev/knox-attestation, xda-developers.com/samsung-pay-not-working-non-samsung-phones, news.samsung.com (Digital Key = eSE), dolphinbyd t/4976.
+- **🆕 Sinal "Xiaomi 17 funciona" DESMONTADO (pesquisa profunda 24/jul):** o post do r/BYD era **hearsay** (thread do Vivo X300, 28/jun: "I saw a recent post...", sem link/modelo/ROM). Não existe NENHUM relato first-hand de BYD funcionando em qualquer Xiaomi 17 até 24/jul — só fracassos (17 e 17 Ultra com BYD M6, mar/abr/2026). O caso real de sucesso é **BMW i4 + Xiaomi 17 base via Google Wallet** (mai/2026, r/BMWI4 1t5p111): prova que a digital key API do Google EXISTE na família 17 e que o Google já whitelisteou o 17 base. **Lista oficial do Google (android.com/digital-car-key, verificada 24/jul): "Xiaomi 12&12 Pro, 13…, 15&15 Ultra, 15T&15T Pro, 17 & 17 Ultra, MIX Flip, Poco F7/F8 Ultra" — NÃO inclui 17 Pro nem 17 Pro Max** (popsicle é modelo China-only, 2509FPN0BC, sem variante Global). Whitelist é por modelo+montadora; BYD e BMW são listas separadas. Não há feature AOSP (`android.hardware.digital_key` não existe) — o DCK vive 100% no Play services/Wallet e a elegibilidade é server-side por identidade do modelo. Flips server-side acontecem (15T Pro Uruguai virou ~08/jul sem update). **Aberto: testar se PIF spoofando gms p/ modelo whitelistingado (17 base ou 17 Ultra, não Pixel) move o gate do Wallet** — a elegibilidade lê a identidade que o GMS reporta; PIF já injeta gms/vending.
+**Progresso 24/jul noite (Sessão 9 — RE do app BYD + gating DCK descoberto):**
+- **RE do app BYD** (fontes decompiladas em `analysis/byd/out2/sources/`): o check de compatibilidade chama `DigitalKeyFramework.getClient(ctx).isCreateDigitalKeyPossible()` — **o veredito é do GMS (módulo DCK do Google)**, não de lista local. O app só envia `deviceManufacturer` (código: xiaomi=0002, via Build.MANUFACTURER — já correto) p/ BYD. A tela "modelos suportados" é a página de ajuda `catalogPage` aberta quando o check do GMS falha. Lógica principal ofuscada via JNI (`com.fort.andjni`).
+- **Gating do DCK no GMS (logcat, tag `Dck`, service_id=289):** `[WirelessCapabilitiesFeatures] wccSysProp: 0` (prop desconhecida, int 0-3, default 0) + `wccOverride: not set` → `hasWccSupport: false` → `downloadAllowed: false` → módulo DCK completo nem baixa ("Initializing as WCC1"). **WCC = classe de capacidade do CCC: 1=NFC, 2=NFC+BLE, 3=NFC+BLE+UWB.**
+- **Fato novo importante (ZN):** o match do `.perapp_props` é por **nome de processo** (nice_name), não de pacote — `com.google.android.gms` só cobre o processo principal. O Chimera DCK roda em **`com.google.android.gms.persistent`** (precisa de linhas próprias na config). `.unstable` fica DE FORA de propósito (DroidGuard/PIF Pixel 10; PI 3/3 mantido).
+- **Spoof aurora (14 Ultra: model=24030PN60G/device/name=aurora/marketname)** aplicado via COW + Build.* (JNI novo no módulo) em: gms, gms.persistent, walletnfcrel (sem efeito — wallet sob umount não é injetado), bydautolink (precisou **desligar umount no manager UI**). Mesmo com tudo spoofado: incompatível → veredito depende do wcc, não do modelo.
+- **Override phenotype aplicado:** `DckFeatureMain__wcc_override=3` inserido em `/data/data/com.google.android.gms/databases/phenotype.db` (`flag_overrides` id 18 + `flag_overrides_to_commit`, config_package_id **231** = `com.google.android.gms.dck`; backup do db em `/data/local/tmp/phenotype.db*`). Formato decodificado dos overrides existentes (os do Android Auto/DiLink, ids 1-17): type 1=int, 4=string, account_id=0. **Commit não dispara com force-stop — gatilho provável é boot.** Existe broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE` (--es package/flag/type/value) como alternativa. ⚠️ GMS novo **reverte overrides em ≤24h** (configs assinadas) — pode precisar re-aplicação periódica.
+- **App BYD zerado + spoof ativo: mesmo veredito** (veredito não é cache local nem modelo reportado).
+- Pesquisa: nenhuma menção pública a `wccSysProp`/`wccOverride` — nome da prop só via decompilação do GMS (classe `WirelessCapabilitiesFeatures`).
+- ⏳ **PRÓXIMO:** decidir rota pro `downloadAllowed` (ver abaixo — Sessão 9 parte 2).
 
-### 2.2 Petal Maps (EM ABERTO — parada aqui em 24/jul ~14h)
-**Objetivo:** rodar Petal Maps ≥4.7.0.316 (últimas features) — desde essa versão o app exige device Huawei. Instalado: **4.7.0.319** (sideload APKCombo, sha256 `fc1ebc0f…d3ad3`). HMS Core (`com.huawei.hwid`) e AppGallery já estavam no device.
+**Sessão 9 parte 2 (24/jul noite — fundo do poço do DCK):**
+- **`wccSysProp` = `ro.gms.dck.eligible_wcc`** (int 0-3, default 0) — fonte: `defpackage/bsst.java` (classes6.dex do gms base, jadx on-device). **SETADA ao vivo via `setprop` (funciona pq a prop não existia) e persistida em `.props_spoof` do DeviceID+ (service.sh boot_completed+5s)** → `wccSysProp: 3` no log, `hasWccSupport` passou. **Mesmo assim app BYD segue bloqueado.**
+- **Gate restante = `downloadAllowed` = flag `DckStub__full_module_download_allowed`** (bool, default false) — fonte: `defpackage/jycg.java` (classes15.dex). Eligibility do módulo: `bsog.b()` = `wcc>0 && downloadAllowed`. Outras flags do stub: `DckStub__are_flags_synced` (default false!), `DckStub__disable_dck_support`. Override wcc = `DckFeatureMain__wcc_override` (long, default -1; jybv.java). gtwx registra pacote `com.google.android.gms.dck` (config_package_id **231**, params VAZIOS — servidor não serve DCK p/ este modelo).
+- **Phenotype schema novo (db v1033+) decodificado** (classes8: fkch/fkee/fjzr): merge de overrides exige link em `experiment_states_to_overrides` com o `committed_experiment_state_id` do pacote (dck = 4372). Aplicamos: overrides id 18 (`DckFeatureMain__wcc_override=3` type 1), 19 (`DckStub__full_module_download_allowed=1` type 0), 20 (`DckStub__are_flags_synced=1`) + links p/ 4372 + `flag_overrides_to_commit`. **NADA aplica** — a op de leitura chama-se `getCommittedOverridesPhixit` ("Phixit" = ferramenta de debug interna; provável que overrides só funcionem em fluxo dogfood/debug, e o gtwx em produção leia só config servida). Broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE` retorna 0 sem efeito. XML `gms_chimera_phenotype_flags.xml` é cache write-only (edição ignorada). **Os overrides antigos do Android Auto (ids 1-17) NÃO têm link em experiment_states_to_overrides — possivelmente nunca aplicaram via phenotype.**
+- Backup phenotype.db em `/data/local/tmp/phenotype.db*`. Fontes gms decompiladas on-device: `/data/local/tmp/gmsout{,8,15}/`; classes-chave copiadas p/ `analysis/byd/*.java` no repo.
+- **Rotas possíveis pro downloadAllowed:** (a) **GMS Phixit** (polodarb, app root feito p/ o schema novo — chama a op oficial; revert ≤24h por configs assinadas, precisa re-aplicar); (b) chamar a binder op `SetFlagOverridesOperation` direto; (c) aceitar que pode haver gate server-side adicional (allowlist de modelo no download do módulo — `downloadAllowed` pode ser decidido no servidor, não só local).
+
+**Sessão 9 parte 3 (24/jul ~23h — overrides esgotados, veredito empírico):**
+- **GMS Phixit testado** (fork jcrutch-design/GMS-Phixit-Android17 v1.5, sha256 `8b0fc972…`, instalado como `ua.polodarb.gmsphixit`): escreveu o registry completo de flags DCK (~90 overrides, ids 21-109, incl. `DckStub__full_module_download_allowed=1` e `DckStub__are_flags_synced=1`) em `flag_overrides` + `flag_overrides_to_commit`. **Sem efeito no read path de produção.**
+- Complementos manuais testados, todos sem efeito: links de TODOS os overrides dck → `experiment_states_to_overrides` no estado commitado 4372 (92 links); espelho dos overrides na **conta 1** (usuário) + links no estado 3889. `downloadAllowed: false` persistiu em todas.
+- **Veredito: no GMS 26.28.60 (262860035) de produção, o gtwx NÃO aplica overrides de phenotype por nenhum canal local conhecido** (db, links, Phixit, broadcast FLAG_OVERRIDE, XML chimera). O read path real do gtwx (gtvd/gtwx em classes.dex, não decompilado ainda) provavelmente lê só a config servida — e o servidor não serve DCK p/ este modelo (params vazios).
+- **Próximos passos possíveis (não executados):** (1) decompilar `classes.dex` (gtvd/gtwx client) p/ achar o read path real (pode haver cache de snapshot p/ invalidar); (2) cirurgia protobuf no `experiment_token`/`params` servido; (3) aceitar gate server-side.
+- Estado final bom: `ro.gms.dck.eligible_wcc=3` ATIVA + persistida em `.props_spoof` (DeviceID+ service.sh); wcc=3 lido em todo boot. Overrides dck ficam no db (inertes) — backup em `/data/local/tmp/phenotype.db*`.
+
+**REVERSÃO (24/jul ~23:30, a pedido do usuário — frente encerrada):** `.perapp_props` restaurada (só Petal); `ro.gms.dck.eligible_wcc` removida de `.props_spoof` e deletada ao vivo; TODOS os overrides/links dck apagados do phenotype.db (0 restantes, backup deletado); `gms_chimera_phenotype_flags.xml` restaurado do backup; **GMS Phixit desinstalado**; `/data/local/tmp` limpo dos artefatos da sessão; gms reiniciado e verificado SEM injeção/spoof; `analysis/byd/` no repo podado (ficaram só os `.java` de análise: bsst/bsog/jy*/fj*/fk*/gtwx). **Pendência manual: re-ligar o "Umount modules" do app BYD no KSU manager** (foi desligado pra injeção). DeviceID+ `.so` com Build.* spoof (v2.2.0-dev) PERMANECE (feature válida, inócua). Bump v2.2.0 + commit do native seguem pendentes.
+- Arquitetura do check no app BYD: `DigitalKeyHelper.t()` → `isCreateDigitalKeyPossible()` (GMS); erro exibido em WebView (`catalogPage`). App envia `deviceManufacturer` (0002=xiaomi) p/ servidor BYD. Verificação Samsung: `com.samsung.android.dkey` + content provider (não se aplica). Check "China devices should not use Google DCK" (bmms) PASSA (não aparece no log).
+
+### 2.2 Petal Maps (✅ RESOLVIDA 24/jul ~18:20 — COW prop_area validado em campo)
+**Objetivo:** rodar Petal Maps ≥4.7.0.316 — desde essa versão o app exige device Huawei. Instalado: **4.7.0.319** (sideload APKCombo, sha256 `fc1ebc0f…d3ad3`). HMS Core (`com.huawei.hwid`) e AppGallery já estavam no device.
 
 **Engenharia reversa (fatos, decompilação própria de 8 APKs — artefatos em `/data/data/com.termux/files/usr/tmp/petal/`):**
 - Bloqueio introduzido na **4.7.0.316** (04/mai/2026); **4.7.0.315 é a última sem bloqueio**.
-- Check ÚNICO e local, na `SplashActivity` (`onCreate`/`onResume`): `tp2.g()` lê **`ro.product.manufacturer` via reflexão em `android.os.SystemProperties.get`** e exige `"HUAWEI"` exato. Falha → diálogo não-cancelável "Petal Maps is only available for Huawei devices" → `killProcess`. Hooks que só mudam `android.os.Build.*` **não bastam**.
-- Sem attestation server-side, sem check de HMS Core no gate, sem check de brand/model/emui no caminho do bloqueio (essas props existem no APK só pra feature-gating).
+- Check ÚNICO e local, na `SplashActivity` (`onCreate`/`onResume`): `tp2.g()` lê **`ro.product.manufacturer` via reflexão em `android.os.SystemProperties.get(String)`** e exige `"HUAWEI"` exato (fonte decompilada revisada em 24/jul: `out319/sources/defpackage/tp2.java` — confere; log emitido: tag `HmsMapApp_M_EnvironmentUtil`, msg `Get Manufacturer: <valor>`). Falha → diálogo não-cancelável "Petal Maps is only available for Huawei devices" → `killProcess`.
+- Sem attestation server-side, sem check de HMS Core no gate, sem check de brand/model/emui no caminho do bloqueio.
 
-**Tentativas (cronológico):**
-1. **COPG free c/ perfil Huawei** → FALHOU: tier free spoofa `Build.*` mas NÃO props nativas (prop spoof `:cow` é PRO). App seguia "not Huawei Phone".
-2. **Descoberta da stack:** apps fora das exceções do KSU (kernel_umount global) **não recebem injeção zygisk** (ZN os trata como denylisted). Sem CLI — usuário desativou "Umount modules" p/ `com.huawei.maps.app` na UI do manager → injeção passou a ocorrer (prova: MIUI no processo lê `device is HWALN` do perfil COPG).
-3. **DeviceID+ v2.1.0 — zygisk próprio** (commit `a2e90c5`): hook GOT das 3 funções bionic de leitura de props, ativo só no pacote-alvo. Smoke test standalone PASSOU (GOT patch real: direct call spoofada, dlsym control real). Config: `com.huawei.maps.app|ro.product.manufacturer=HUAWEI`.
-4. **Pós-reboot:** logs provam injeção+hooks ativos — `DeviceIDPlus: com.huawei.maps.app: 1 spoof entrie(s) loaded` + `hooks installed: images=407 relocs=72247 patched=272 errors=0`. **MAS o app continua dizendo que não é Huawei.**
+**Caminho percorrido em 24/jul (Sessão 8 — cronológico):**
+1. **BUG RAIZ #1 encontrado e corrigido:** os hooks `my___system_property_read`/`read_callback` checavam o retorno de `__system_property_read` com `== 0`, mas a bionic retorna o **VALUE LENGTH** (≥ 0) → spoof nunca aplicava nesses caminhos. Fix `>= 0` + retorno do len spoofado (smoke test estendido cobre get/read/read_callback).
+2. **SIGILL/SIGSEGV em todo app injetado (2 incidentes):** causados por **trocar o `.so` do módulo a quente** — o ZN cacheia o entry offset do módulo no zygote; o arquivo novo tem entry em outro offset → salto p/ padding. Reboot resolve (e só). **Regra nova: `.so` zygisk só se troca com reboot.**
+3. **USAP pool quebra a injeção do ZN 1.4.3 silenciosamente** (`.so` mapeado, entry nunca chamada — caso documentado análogo: NeoZygisk#73). Pool desativado (ver 1.2) → injeção estável.
+4. **GOT patching não alcança o caminho do check:** com hooks comprovadamente instalados (verbose log: write+readback OK no slot certo de `libandroid_runtime`), o check leu `Xiaomi` ~350 ms depois. Trace filtrado mostrou queries incidentais (`ro.build.version.sdk`, `ro.product.board`) via `get`, mas **NENHUMA query de `ro.product.manufacturer` por qualquer um dos 3 símbolos hookados** — o JNI da MIUI lê a prop por caminho que não atravessa os slots patcheados (AOSP A16 usa `__system_property_find`+`read_callback`; MIUI aparentemente outra rota). Conclusão: GOT hooks são insuficientes aqui.
+5. **Solução implementada — COW do prop_area (estilo COPG `:cow`, que é exatamente o que o COPG PRO faz):** `prop_cow.cpp` copia as páginas do prop_area que contêm a prop p/ mapping privado anônimo no MESMO endereço (per-process) e reescreve o valor in-place (serial protocol da bionic). Cobre JNI/nativo/parse direto/static-linked. Smoke test PASS: `__system_property_get` cru retorna `HUAWEI` sem nenhum hook ativo.
+6. ✅ **VALIDADO 24/jul ~18:20** (pós-reboot da instalação da v2.1.1): log `Get Manufacturer: HUAWEI`, app passa do gate e abre (PrivacyActivity). Config temporária do Termux removida de `.perapp_props` (ficou só `com.huawei.maps.app|ro.product.manufacturer=HUAWEI`). Pendente: bump v2.2.0 + commit do native; **decisão em aberto: reativar USAP pool** (fato 19 — reativar pode reintroduzir injeção flaky; requer reboot p/ efeito completo).
+7. **Flakiness residual do ZN:** mesmo com USAP off, houve lançamento (Termux pid 5065) em que a entry do módulo não foi chamada (sem crash, sem log). Investigar se persiste; mitigação prática: force-stop + relançar.
 
-**Hipóteses abertas (investigar na retomada):**
-- (a) `SystemProperties.get` no A16 pode **não passar pelos 3 símbolos hookados** — libandroid_runtime pode ler via `__system_property_find` + leitura direta do prop_info. **Verificação:** disassemblar `android_os_SystemProperties` em `/system/lib64/libandroid_runtime.so` (ou checar suas relocações) e cobrir o caminho real (hookar `__system_property_find` retornando prop_info falso, ou interceptar o JNI `native_get`).
-- (b) O check pode estar numa lib nativa do app carregada DEPOIS do postAppSpecialize (hooks só cobrem imagens carregadas na especialização). Cobrir: re-varrer `dl_iterate_phdr` após `Application.onCreate`, ou confirmar via RE que o check é 100% Java/reflexão.
-- (c) Confirmar com o usuário a **mensagem EXATA** exibida e se o app morre ou segue (distingue o gate da splash de aviso posterior de feature/HMS). Nota: logs `HmsMapApp_M_SplashActivity` ("enterHome not Huawei Phone") NÃO apareceram no boot atual.
+**Fontes de referência (pesquisa 24/jul):** AOSP `android_os_SystemProperties.cpp` (android16-release: JNI = find+read_callback, sem intrinsics em ART); COPG changelog v5.3.0 (COW substitui GOT hooking; v5.4.0: caveat de props >91 chars no A16 — nossa chave é curta, OK); KernelSU PR #3470 (leitores static-linked bypassam hooks); NeoZygisk#73 (USAP não injeta); ZN wiki FAQ (safe mode após crash de zygote; "Umount modules" do KSU = denylist p/ ZN).
 
 **Planos B/C disponíveis (não executados):**
 - **APK patch:** forçar `tp2.g()` a `return true` em smali + reassinar (java 21/aapt/apksigner ok no Termux; apktool ausente; smali/baksmali jar roda). Quebra cadeia de updates (re-patch por versão) + risco pequeno com HMS. Fontes decompilados em `usr/tmp/petal/out319/sources`.
-- **COPG PRO** (`:cow` prop spoof) — pago.
+- **COPG PRO** (`:cow` prop spoof) — pago; nossa implementação open faz o equivalente.
 - Ficar na **4.7.0.315** (sem features novas).
 
-### 2.3 Instalar DeviceID+ v2.1.1 no aparelho (quando conveniente)
-- Zip rebuildado em `modules/deviceidchanger/DeviceID-Plus.zip`; instalar via KSU manager. Só é necessário quando precisar mexer no SSAID de novo (o bug da v2.1.0 só manifesta no apply). Lembrar de re-mesclar a config no staged (ver 1.4).
+### 2.3 Instalar DeviceID+ v2.1.1 no aparelho — ✅ FEITO 24/jul ~18:17
 
 ### 2.4 Dívidas técnicas documentadas
 - **Revolut:** alavanca futura = SuSFS (WildKernels `.ko` p/ android16-6.12, ou kernel Kokuban ReSukiSU, ou build próprio via `popsicle-w-oss`)
@@ -133,8 +161,10 @@
 - **Dois devices no adb:** usar `adb -s 4d7fc9af` (há um emulator-5554 aparecendo às vezes).
 - **Pipes no Windows cmd:** evitar `|` dentro de `su -c "..."` (quebra) — usar scripts em arquivo ou comandos separados; evitar `\$` escapado (passa literal); `$(...)` sem escape funciona.
 - **Git no Termux:** identidade já configurada no repo; push exige `gh auth setup-git` uma vez (feito). Se "divergent branches": `git pull --rebase origin main`.
-- **Build do .so zygisk:** `cd modules/deviceidchanger/native && ./build.sh` (Termux clang 21, sai em `module/zygisk/arm64-v8a.so`; `./build.sh test` compila o smoke test `test_hook` — rodar como root). Verificar DT_NEEDED só com libs do sistema (build.sh já falha se sujar).
-- **Diagnóstico de apps:** `logcat -b all -c` → lançar app → `logcat -d -b all > arquivo`. Nosso .so loga na tag `DeviceIDPlus` (carregamento de config + resumo dos hooks).
+- **Build do .so zygisk:** `cd modules/deviceidchanger/native && ./build.sh` (Termux clang 21, sai em `module/zygisk/arm64-v8a.so`; `./build.sh test` compila o smoke test `test_hook` — rodar como root; `./build.sh inspect` gera o inspetor standalone em /data/local/tmp). Verificar DT_NEEDED só com libs do sistema (build.sh já falha se sujar). **Deploy do .so exige reboot** (fato 20). No su do adb, exportar `PATH=/data/data/com.termux/files/usr/bin:$PATH` antes.
+- **Diagnóstico de apps:** `logcat -b all -c` → lançar app → `logcat -d -b all > arquivo`. Nosso .so loga na tag `DeviceIDPlus` (carregamento de config + resumo dos hooks + COW) e `DIDPTrace` (queries filtradas, debug).
+- **Ferramentas forenses próprias** (C, compilam no Termux, rodam como root em `/data/local/tmp/`): `scripts/analysis/memread.c` (process_vm_readv), `memscan.c` (varre maps p/ valores-ponteiro), `propread_test.c` (semântica de retorno das props), `native/inspect_lar.cpp` + `inspect_preload.cpp` (replay do motor de hook fora do zygisk).
+- **Watcher de reboot p/ sessões:** loop lendo `/proc/uptime` via adb — reset = reboot real (`sys.boot_completed` sozinho engana se o device não cair).
 
 ---
 
@@ -156,8 +186,19 @@
 14. **317 não trocou o kernel** (mesmo abogki4639 da 315) — por isso o .ko 32558 serviu direto.
 15. **GSF reset NÃO muda ANDROID_ID por app** (SSAID vive em `/data/system/users/0/settings_ssaid.xml`, ABX desde A12; só factory reset zera). Bancos BR provavelmente bindam aí + ADB_ENABLED.
 16. **No KSU, apps sob "umount global" NÃO recebem injeção zygisk** (ZN trata como denylisted; exceções ficam em `/data/adb/ksu/.allowlist`, binário magic "KSU"; sem CLI — só UI do manager, toggle "Umount modules" por app). Prova: Petal Maps só passou a ser injetado após desativar o umount dele (MIUI no processo leu o `HWALN` do perfil COPG).
-17. **GOT/PLT patching de props funciona no A16 userspace** (smoke test standalone: direct call spoofada, dlsym control real; e no zygote via ZN: `patched=272 errors=0` no processo do Petal Maps). `__system_property_get_name` **não é exportado** na bionic do A16 — derivar nome via `__system_property_read` original.
+17. **GOT/PLT patching de props funciona no A16 userspace** (smoke test standalone: direct call spoofada, dlsym control real; e no zygote via ZN: `patched=272 errors=0` no processo do Petal Maps). `__system_property_get_name` **não é exportado** na bionic do A16 — derivar nome via `__system_property_read` original. **`__system_property_read` retorna o VALUE LENGTH (≥ 0), não 0-on-success** — checar com `>= 0`.
 18. **`screencap` não serve p/ diagnóstico de app aqui** (captura o Termux em foreground); `uiautomator dump` falha com "could not get idle state" com frequência e só vê lockscreen com tela bloqueada.
+19. **ZN 1.4.3 NÃO injeta em processos vindos do USAP pool** (`.so` do módulo fica mapeado mas a entry nunca é chamada; sem log, sem crash — NeoZygisk#73 documenta o análogo). MIUI usa o pool agressivamente ("boost cold start"). Workaround: `device_config put runtime_native usap_pool_enabled false` (persiste) + `persist.sys.usap_pool_enabled=false` + `dalvik.vm.usap_pool_enabled=false`. ZN também pode deixar de chamar a entry esporadicamente mesmo com pool off (causa desconhecida; force-stop+relaunch mitiga).
+20. **O ZN cacheia o entry offset do `.so` do módulo no zygote** — trocar o `.so` a quente (mesmo com `cp` preservando inode) faz todo app injetado crashar na specialize (SIGILL em padding abaixo do `.text` novo / SIGSEGV em zn_alloc), inclusive com o módulo "disabled" (o flag só vale após reboot). **NUNCA trocar `.so` zygisk sem reboot.**
+21. **`liblog` lê props internamente** (`log.tag.*`): logar incondicionalmente dentro de um hook de `__system_property_get/find` recursa até estourar a pilha. Filtrar o log por chave ou usar guard de reentrância.
+22. **`dd` em `/proc/<pid>/mem` retorna ZEROS neste setup** (toybox/SELinux) — leitura cruzada de memória só confiável via `process_vm_readv` (ferramentas próprias: `scripts/analysis/memread.c`, `memscan.c`, compiladas no device com clang do Termux; em `/data/local/tmp/`).
+23. **`wrap.<pkg>` (LD_PRELOAD em app) exige `ro.debuggable=1`** — aqui é 0, não funciona. app_process com LD_PRELOAD a partir do shell FUNCIONA p/ reproduzir contexto ART (mas NÃO reproduz o contexto de lib preloaded do zygote).
+24. **GOT hook não cobre o caminho JNI da MIUI p/ SystemProperties** (com hooks instalados e verificados no slot certo de libandroid_runtime, `SystemProperties.get` via reflexão segue retornando o valor real). A solução à prova de caminho é **COW do prop_area** (COPG `:cow` faz o mesmo; KernelSU PR #3470 confirma que leitores estáticos/diretos bypassam hooks dinâmicos).
+25. **O match do ZN/zygisk é por NOME DE PROCESSO (nice_name), não pacote** — `com.google.android.gms` no `.perapp_props` só cobre o processo principal; `.persistent`/`.unstable` precisam de linhas próprias. Prova via `/proc/<pid>/maps`: módulo mapeado só no processo principal até adicionarmos as linhas (o Chimera DCK roda no `.persistent`).
+26. **`setprop` CRIA prop `ro.*` inexistente** (root, ao vivo): `setprop ro.gms.dck.eligible_wcc 3` funcionou porque a prop não existia (ro.* só trava depois de existir). Persistência pela service.sh do DeviceID+ (resetprop pós-boot_completed).
+27. **`android.os.Build.*` é assado no zygote** — nem COW nem GOT hooks alcançam; apps que checam modelo via `Build.MODEL` (ou WebView UA, derivado de Build.*) exigem spoof JNI do campo estático no processo (técnica do PIF; implementada no DeviceID+ v2.2.0-dev). Diagnóstico: DIDPTrace mostrava zero queries de `ro.product.model` no app alvo.
+28. **GMS 26.28.60 produção NÃO aplica overrides de phenotype por nenhum canal local** — testados: `flag_overrides` + `flag_overrides_to_commit` + links em `experiment_states_to_overrides` (estado commitado 4372), contas 0 e 1, broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE`, edição do `gms_chimera_phenotype_flags.xml`, e o app **GMS Phixit** (escreveu ~90 flags do registry DCK). Op de leitura = `getCommittedOverridesPhixit` (canal debug). Schema novo (db v1033+) decodificado: merge exige link override↔committed_experiment_state; configs servidas ficam em `experiment_states.experiment_token` (params/dynamic_params quase sempre vazios).
+29. **Digital Car Key do Google (DCK): gating documentado por RE própria** — `isCreateDigitalKeyPossible()` exige `wcc>0 && downloadAllowed`. wcc = `SystemProperties.getInt("ro.gms.dck.eligible_wcc", 0)` (classe `bsst`, classes6.dex do gms) com override opcional `DckFeatureMain__wcc_override`; `downloadAllowed` = flag `DckStub__full_module_download_allowed` (default false; jycg.java). WCC: 1=NFC, 2=+BLE, 3=+UWB. Sem config servida p/ o modelo → stub fica em defaults → módulo DCK completo nunca baixa.
 
 ---
 
@@ -258,13 +299,32 @@
 3. **Regras novas do usuário:** NUNCA rebootar por conta própria (pedir sempre — há outros agentes rodando); screencap não serve p/ diagnóstico (pega o Termux); pedir artefatos ao usuário quando necessário.
 4. Casa de código: identidade git configurada, `gh auth setup-git` feito, `.gitignore` cobre `native/test_hook`.
 
+### Sessão 8 (24/jul tarde — Petal: forense completa + COW prop_area + manager 32562)
+1. **Bug raiz do spoof per-app:** hooks read/read_callback checavam `__system_property_read` com `== 0`; bionic retorna value length → spoof nunca aplicava. Fix `>= 0` + smoke test estendido (get/read/read_callback/COW).
+2. **Dois incidentes de crash em apps injetados** → causa: troca de `.so` zygisk a quente com entry offset cacheado no zygote pelo ZN (fato 20). Usuário fez 4 reboots manuais no dia.
+3. **USAP pool desativado** (fato 19) após provar que o ZN não injeta em processos do pool.
+4. **Manager KSU atualizado 32559 → 32562 (v3.2.4-36)** via `gh release download` + `pm install -r` (APK em `tools/ksu_apk/`).
+5. **GOT patching forense:** com logging verbose por slot (build `PERAPP_VERBOSE_PATCH`), provado que o patch cai no slot correto de libandroid_runtime (readback OK) e o check JNI da MIUI **mesmo assim** lê o valor real → caminho não coberto por GOT (fato 24). Ferramentas novas: `scripts/analysis/memread.c`, `memscan.c`, `propread_test.c` (compilam no Termux, ficam em `/data/local/tmp/`).
+6. **COW do prop_area implementado** (`native/prop_cow.cpp`) e integrado ao módulo (COW primeiro, GOT hooks como complemento). Smoke test PASS completo. **Aguardando reboot de validação no Petal** (`.so` deployado ~17:46).
+7. Pesquisa web (3 agentes): bypass do Petal não existe publicamente (nossa RE é a única); AOSP A16 JNI = find+read_callback; COPG `:cow` = COW prop_area (valida a abordagem); NeoZygisk#73 = USAP não injeta; ZN tem safe mode pós-crash de zygote.
+
+### Sessão 9 (24/jul tarde/noite — Petal RESOLVIDA, DeviceID+ completo, BYD/DCK fundo do poço)
+1. **DeviceID+ v2.1.1 instalada** (zip rebuildado com o `.so` COW — o zip anterior não o continha e teria apagado o spoof) + config re-mesclada. **Petal VALIDADO pós-reboot: `Get Manufacturer: HUAWEI`, app abre — frente Petal fechada.** Config temporária do Termux removida; COPG removido pelo usuário.
+2. **BYD digital key — jornada completa até o veredito:** pesquisa desmontou o boato "Xiaomi 17 funciona" (hearsay; único sucesso real = BMW i4 + Xiaomi 17 base — BYD e BMW têm whitelists separadas; lista oficial do Google tem "17 & 17 Ultra", **não** 17 Pro Max). Spoof aurora (14 Ultra) via COW + **spoof `Build.*` JNI novo no módulo** em gms/wallet/app BYD (descoberta: match por nome de processo — fato 25; umount do BYD desligado p/ injetar) → bloqueio persistiu. **RE do app BYD + GMS:** check = `isCreateDigitalKeyPossible()` (GMS DCK); gates = `ro.gms.dck.eligible_wcc` (**setada=3, persistida**) + flag phenotype `DckStub__full_module_download_allowed` (**imbatível**: GMS produção não aplica overrides — fato 28). Testado até GMS Phixit. **Frente ENCERRADA com reversão completa** (config, prop, phenotype, Phixit, tmp) — aparelho voltou ao estado estável, PI 3/3, Petal ok.
+3. **Legado:** mapa do DCK no Parte 2.1/6.G, fatos 25–29, fontes gms analisadas em `analysis/byd/*.java`, DeviceID+ com 3º mecanismo de spoof (Build.* JNI).
+4. Quirks do dia: 2º device apareceu no adb (Redmi `f10c4f767d7b`, slot _b) — sempre conferir serial/modelo antes de comandos; jadx on-device fica em `/data/data/com.termux/files/usr/tmp/petal/jadx` (rodar com `sh .../bin/jadx` + java no PATH).
+
 ---
 
 ## PARTE 8 — REGRAS DE OURO
 
 - NUNCA `fastboot flashing lock` · NUNCA editar vbmeta na mão · sempre conferir **POPSICLE** (não PANDORA) nos downloads
 - **NUNCA rebootar o aparelho por conta própria — sempre pedir ao usuário** (há outros agentes/sessões rodando no device)
+- **NUNCA trocar o `.so` de módulo zygisk a quente** — o ZN cacheia o entry offset no zygote; todo app injetado crasha até o reboot. Build → deploy → REBOOT → teste (fato 20)
 - `fastboot set_active a|b` (underscore) · adb push/pull via `/storage/emulated/0/...` ou `/data/local/tmp/`
 - Dois devices no adb: `adb -s 4d7fc9af` (ou IP:5555); Git Bash: `MSYS_NO_PATHCONV=1` para paths Unix
 - ADB/dev options DESLIGADOS ao usar app de banco (detecção via `Settings.Global.ADB_ENABLED`)
 - Update de módulo KSU sobrescreve o dir do módulo → re-mesclar config no staged antes do reboot
+- Leitura de memória de outro processo: `process_vm_readv` (memread/memscan), NUNCA `dd` em `/proc/<pid>/mem` (retorna zeros — fato 22)
+- USAP pool: frente Petal fechada; reativação é decisão em aberto (deixar off não custa nada visível)
+- adb com device novo/desconhecido: conferir `ro.product.model` antes de qualquer comando (um Redmi apareceu como `f10c4f767d7b` na Sessão 9)

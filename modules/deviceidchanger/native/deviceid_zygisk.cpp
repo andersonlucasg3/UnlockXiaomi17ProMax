@@ -46,8 +46,14 @@ public:
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
-        /* Only reached for matched packages (table loaded above). */
+        /* Only reached for matched packages (table loaded above).
+         * COW first: it covers every read path (JNI, native, direct prop-area
+         * parsing) with process-local pages; GOT hooks stay as a complement
+         * for dynamically linked native readers. */
+        int cow = perapp_cow_apply();
+        if (cow > 0) LOGI("cow: %d prop(s) applied", cow);
         perapp_install_hooks();
+        spoof_build_fields();
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
@@ -57,6 +63,54 @@ public:
 private:
     zygisk::Api *api;
     JNIEnv *env;
+
+    /* Rewrite the matching static fields of android.os.Build with the spoof
+     * values. The Build class is initialized once in the zygote, so every app
+     * inherits the REAL device values in its Java fields — prop-level spoofing
+     * (COW/hooks) never reaches them. Apps that check compatibility through
+     * Build.MODEL & friends (or a WebView user-agent, which is derived from
+     * Build.*) need this JNI rewrite. Runs in postSpecialize, before any app
+     * code. Same technique as PlayIntegrityFix. */
+    void spoof_build_fields() {
+        static const struct { const char *key; const char *field; } kMap[] = {
+            { "ro.product.brand",        "BRAND" },
+            { "ro.product.manufacturer", "MANUFACTURER" },
+            { "ro.product.model",        "MODEL" },
+            { "ro.product.device",       "DEVICE" },
+            { "ro.product.name",         "PRODUCT" },
+            { "ro.product.board",        "BOARD" },
+            { "ro.product.hardware",     "HARDWARE" },
+            { "ro.build.fingerprint",    "FINGERPRINT" },
+            { "ro.build.id",             "ID" },
+            { "ro.build.display.id",     "DISPLAY" },
+            { "ro.build.host",           "HOST" },
+            { "ro.build.user",           "USER" },
+            { "ro.build.tags",           "TAGS" },
+            { "ro.build.type",           "TYPE" },
+        };
+        jclass cls = env->FindClass("android/os/Build");
+        if (!cls) {
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            return;
+        }
+        int applied = 0;
+        for (int i = 0; i < perapp_count(); i++) {
+            const char *key = perapp_key_at(i);
+            const char *val = perapp_value_at(i);
+            if (!key || !val) continue;
+            for (size_t j = 0; j < sizeof(kMap) / sizeof(kMap[0]); j++) {
+                if (strcmp(key, kMap[j].key) != 0) continue;
+                jfieldID f = env->GetStaticFieldID(cls, kMap[j].field, "Ljava/lang/String;");
+                if (!f) { env->ExceptionClear(); break; }
+                jstring js = env->NewStringUTF(val);
+                env->SetStaticObjectField(cls, f, js);
+                env->DeleteLocalRef(js);
+                applied++;
+                break;
+            }
+        }
+        if (applied > 0) LOGI("build: %d Build.* field(s) spoofed", applied);
+    }
 
     /* Parse ".perapp_props" and load the entries for pkg into the spoof
      * table. Returns true when at least one entry matched. Malformed lines

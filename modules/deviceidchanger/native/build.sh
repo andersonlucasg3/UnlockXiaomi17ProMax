@@ -16,7 +16,7 @@ OUT=../module/zygisk/arm64-v8a.so
 mkdir -p ../module/zygisk
 # shellcheck disable=SC2086
 clang++ -shared -fPIC $CXXFLAGS -nostdlib++ \
-    -o "$OUT" deviceid_zygisk.cpp perapp_hooks.cpp \
+    -o "$OUT" deviceid_zygisk.cpp perapp_hooks.cpp prop_cow.cpp \
     $LIBS -Wl,-s
 
 echo "== DT_NEEDED of $OUT =="
@@ -31,8 +31,17 @@ readelf -sW "$OUT" | grep -E 'zygisk_module_entry|zygisk_companion_entry' || tru
 if [ "$1" = "test" ]; then
     # shellcheck disable=SC2086
     clang++ $CXXFLAGS -nostdlib++ \
-        -o test_hook test_hook.cpp perapp_hooks.cpp \
+        -o test_hook test_hook.cpp perapp_hooks.cpp prop_cow.cpp \
         $LIBS -Wl,-s
     echo "== DT_NEEDED of test_hook =="
     readelf -d test_hook | grep NEEDED
+fi
+
+if [ "$1" = "inspect" ]; then
+    # standalone libandroid_runtime patch inspector (verbose per-slot log)
+    # shellcheck disable=SC2086
+    clang++ $CXXFLAGS -nostdlib++ -DPERAPP_VERBOSE_PATCH \
+        -o /data/local/tmp/inspect_lar inspect_lar.cpp perapp_hooks.cpp \
+        $LIBS
+    echo "== built /data/local/tmp/inspect_lar =="
 fi

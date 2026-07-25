@@ -6,8 +6,8 @@ Fork de [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), l
 ## Recursos
 
 - **SSAID manager**: lista todos os pacotes instalados (filtro 3rd-party/todos + busca), mostra o SSAID atual de cada app, permite enrolar apps para spoof com ID global ou ID custom por app (16 hex). Edita `/data/system/users/0/settings_ssaid.xml` via `abx2xml`/`xml2abx`, inserindo entradas novas quando o app ainda não tem SSAID. Backup/restauração em `/storage/emulated/0/settings_ssaid.backup.xml`.
-- **Build props**: lista editável de pares chave=valor aplicados com `ksud resetprop` (imediato via botão e no boot via `post-fs-data.sh`).
-- **Props por app**: spoof de propriedades de sistema visível apenas para apps escolhidos, via biblioteca Zygisk própria (`zygisk/arm64-v8a.so`, fonte em `native/`). A lib carrega em `preAppSpecialize` as entradas do arquivo flat `.perapp_props` (linhas `pkg|chave=valor`, espelhado de `config.json` pela WebUI) e, apenas nos apps configurados, instala hooks de GOT/PLT nas funções bionic `__system_property_get`, `__system_property_read` e `__system_property_read_callback` de todas as imagens ELF carregadas. Apps não configurados recebem `DLCLOSE_MODULE_LIBRARY` (nada fica mapeado). Vale ao reabrir o app — sem reboot. **Atenção**: o app alvo NÃO pode estar marcado em "umount modules" no KernelSU, senão o spoof não chega até ele.
+- **Build props**: lista editável de pares chave=valor aplicados com `ksud resetprop` (imediato via botão e no boot via `service.sh`, após `boot_completed` — `post-fs-data.sh` é no-op: resetprop naquele estágio bootloopeia o aparelho).
+- **Props por app**: spoof de propriedades de sistema visível apenas para apps escolhidos, via biblioteca Zygisk própria (`zygisk/arm64-v8a.so`, fonte em `native/`). A lib carrega em `preAppSpecialize` as entradas do arquivo flat `.perapp_props` (linhas `pkg|chave=valor`, espelhado de `config.json` pela WebUI — **match por nome de processo**, ex.: `com.google.android.gms.persistent` é um alvo distinto de `com.google.android.gms`) e, apenas nos apps configurados, aplica três mecanismos: (1) **COW do prop_area** (`prop_cow.cpp`) — copia as páginas da prop para um mapping privado e reescreve o valor in-place, cobrindo qualquer caminho de leitura (JNI, nativo, parse direto, static-linked); (2) hooks GOT/PLT das funções bionic `__system_property_get`, `__system_property_read` e `__system_property_read_callback` (`perapp_hooks.cpp`); (3) **spoof de `android.os.Build.*` via JNI** (`deviceid_zygisk.cpp`) — reescreve os campos estáticos (MODEL, DEVICE, PRODUCT, BRAND, MANUFACTURER…) no processo do app, cobrindo leituras Java e WebView UA que os mecanismos de prop não alcançam (a classe Build é inicializada no zygote). Apps não configurados recebem `DLCLOSE_MODULE_LIBRARY` (nada fica mapeado). Vale ao reabrir o app — sem reboot. **Atenção**: o app alvo NÃO pode estar marcado em "umount modules" no KernelSU, senão o spoof não chega até ele.
 - **TrickyStore**: visualiza/edita `/data/adb/tricky_store/target.txt` (adicionar/remover pacotes), quando presente.
 
 ## Estrutura
@@ -16,7 +16,7 @@ Fork de [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), l
 module/
 ├── module.prop
 ├── customize.sh
-├── post-fs-data.sh   # aplica props spoofadas no boot
+├── post-fs-data.sh   # no-op (spoof de props mora no service.sh)
 ├── service.sh        # aplica props spoofadas após boot_completed
 ├── config.json       # configuração persistida pela WebUI
 ├── zygisk/
