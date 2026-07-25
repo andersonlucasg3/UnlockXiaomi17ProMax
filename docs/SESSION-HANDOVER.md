@@ -1,5 +1,5 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Documento vivo de continuidade entre sessões. Última atualização: 24/jul/2026 ~23:45 (pós-Sessão 9 — Petal RESOLVIDA, frente BYD/DCK encerrada com mapa completo, DeviceID+ v2.1.1 instalada + spoof Build.* JNI). Unifica os antigos `SESSION-HANDOVER-2026-07-23.md` e `ESTADO-ATUAL-2026-07-23.md`. Histórico cronológico detalhado das sessões de 21–22/jul: `docs/relatorio-sessao-2026-07-22.md`.**
+**Documento vivo de continuidade entre sessões. Última atualização: 25/jul/2026 (pós-Sessão 10 — Revolut: forense completa, `.ko` com hide; suspeito nº1 = keybox). Unifica os antigos `SESSION-HANDOVER-2026-07-23.md` e `ESTADO-ATUAL-2026-07-23.md`. Histórico cronológico detalhado das sessões de 21–22/jul: `docs/relatorio-sessao-2026-07-22.md`.**
 
 ---
 
@@ -13,7 +13,7 @@
 - **Recovery:** TWRP 3.7.1 unofficial (variante `fix22ZX_pinwork_partialdecryption`) — mantido como rede de segurança, decripta /data com PIN (foi o que salvou os 2 bootloops da frente Caixa)
 
 ### 1.2 Root e stack
-- **KernelSU LKM** driver **32558** (backslashxx) no `init_boot`; manager `me.weishu.kernelsu` **32562 (v3.2.4-36)** — atualizado em 24/jul via `pm install` do APK do release backslashxx (em `tools/ksu_apk/`), **adb root ON** (funciona também via Wi-Fi: `adb tcpip 5555` → `adb connect <ip>:5555`; não persiste a reboot)
+- **KernelSU LKM** driver **32558** (fork `andersonlucasg3/KernelSU` branch `hide-lkm`, patch `9ea26f3`: `kobject_del`+`list_del` — módulo **invisível** em `/proc/modules` e `/sys/module`, build via Actions run 30156878115; `.ko` em `tools/ksu_apk/`, imagem em `backup\ksu-migration\init_boot-317-ksu-hide.img` sha `2079b885…`) no `init_boot`; manager `me.weishu.kernelsu` **32562 (v3.2.4-36)** — atualizado em 24/jul via `pm install` do APK do release backslashxx (em `tools/ksu_apk/`), **adb root ON** (funciona também via Wi-Fi: `adb tcpip 5555` → `adb connect <ip>:5555`; não persiste a reboot)
 - **ZygiskNext 1.4.3-817** (enforce-denylist; `modules64: deviceidchanger, playintegrityfix`)
 - **USAP pool DESATIVADO** (fatos 19/20): `device_config put runtime_native usap_pool_enabled false` (persiste) + `persist.sys.usap_pool_enabled=false` + `setprop dalvik.vm.usap_pool_enabled false` (volátil). **Frente Petal fechada 24/jul — reativação é decisão em aberto** (risco: injeção ZN flaky volta; requer reboot)
 - **PlayIntegrityFork v17** com `custom.pif.prop` = **Pixel 10 (frankel, Canary ZP11.260618.005 — expira 2026-08-19, rodar Action do PIF p/ renovar)**
@@ -28,7 +28,7 @@
 | Google Wallet | ✅ |
 | BYD | ✅ |
 | Caixa / bancos BR | ✅ **RESOLVIDA 23/jul ~21h** (Parte 3) |
-| Revolut | ❌ postergado (alavanca: SuSFS — Parte 2.4) |
+| Revolut | ❌ (Parte 2.4 — forense completa; suspeito nº1: keybox vazada) |
 | **Petal Maps 4.7.0.319** | ✅ **RESOLVIDA 24/jul ~18:20** — COW prop_area validado: `Get Manufacturer: HUAWEI`, app passa do gate (Parte 2.2) |
 
 ### 1.4 Módulo DeviceID+ (fork próprio)
@@ -44,6 +44,7 @@
 | init_boot Magisk 30.7 (rollback completo) | `backup\ksu-migration\init_boot_a_backup.img` | `c951cdf4…` |
 | boot stock 315 | `backup\ksu-migration\boot_a_backup.img` | `6c48dd3f…` |
 | init_boot KSU 317 (re-flash rápido) | `backup\ksu-migration\init_boot-317-ksu.img` | `68f996d9…` |
+| init_boot KSU 317 **+hide** (atual) | `backup\ksu-migration\init_boot-317-ksu-hide.img` | `2079b885…` |
 | vbmeta original (flags=0) | `rom\popsicle_eu_3.0.315\images\vbmeta.img` | — |
 | SSAID pré-randomize | `backup\settings_ssaid-pre-randomize.xml` | — |
 
@@ -130,7 +131,7 @@
 ### 2.3 Instalar DeviceID+ v2.1.1 no aparelho — ✅ FEITO 24/jul ~18:17
 
 ### 2.4 Dívidas técnicas documentadas
-- **Revolut:** alavanca futura = SuSFS (WildKernels `.ko` p/ android16-6.12, ou kernel Kokuban ReSukiSU, ou build próprio via `popsicle-w-oss`)
+- **Revolut (Sessão 10, 25/jul — diagnóstico completo, não resolvido):** splash "ambiente não é seguro" (veredito LOCAL do RASP, DexProtector/Licel confirmado por pesquisa). Eliminados como causa: mounts, PI 3/3, attestation TS, `/system/bin/su` (adb root off), frida-server, `/proc/modules`+`/sys/module` ksu (**resolvido permanentemente via `.ko` com hide — ver 1.2**), `/proc/kallsyms` (limpo), prctl (driver não responde — fato 30), ADB, SSAID novo + clear data, manager congelado. **Injeção zygisk no app é INVIÁVEL** (maps scan → `MessageGuardException` instantâneo). **Suspeito nº 1 (pesquisa): keybox vazada DroidWin — Revolut rejeita keyboxes populares mesmo com PI 3/3** (guia XDA 4773849: PI 3/3 + keybox queimada = bloqueio; trocar keybox = volta). Próximos passos: (1) keybox privada/não-vazada; (2) HMA-OSS/HMAL whitelist (DexProtector enumera pacotes via Binder raw); (3) TEESimulator (atenção: attestation malformada = MessageGuard); (4) attestation↔Build consistency (frankel×Xiaomi) é hipótese plausível não confirmada. SuSFS = **estruturalmente impossível neste device** (VFS built-in, exige boot.img — fato 31).
 - **Keybox treadmill:** trocar `/data/adb/tricky_store/keybox.xml` quando revogar + reboot
 - **Print do PIF expira 2026-08-19:** rodar Action do PIF para renovar antes
 - **Atualizador de apps de sistema:** RESOLVIDO — usuário desinstalou o app de update (era by design, assinatura EU ≠ Xiaomi — ver Parte 6.E)
@@ -199,6 +200,9 @@
 27. **`android.os.Build.*` é assado no zygote** — nem COW nem GOT hooks alcançam; apps que checam modelo via `Build.MODEL` (ou WebView UA, derivado de Build.*) exigem spoof JNI do campo estático no processo (técnica do PIF; implementada no DeviceID+ v2.2.0-dev). Diagnóstico: DIDPTrace mostrava zero queries de `ro.product.model` no app alvo.
 28. **GMS 26.28.60 produção NÃO aplica overrides de phenotype por nenhum canal local** — testados: `flag_overrides` + `flag_overrides_to_commit` + links em `experiment_states_to_overrides` (estado commitado 4372), contas 0 e 1, broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE`, edição do `gms_chimera_phenotype_flags.xml`, e o app **GMS Phixit** (escreveu ~90 flags do registry DCK). Op de leitura = `getCommittedOverridesPhixit` (canal debug). Schema novo (db v1033+) decodificado: merge exige link override↔committed_experiment_state; configs servidas ficam em `experiment_states.experiment_token` (params/dynamic_params quase sempre vazios).
 29. **Digital Car Key do Google (DCK): gating documentado por RE própria** — `isCreateDigitalKeyPossible()` exige `wcc>0 && downloadAllowed`. wcc = `SystemProperties.getInt("ro.gms.dck.eligible_wcc", 0)` (classe `bsst`, classes6.dex do gms) com override opcional `DckFeatureMain__wcc_override`; `downloadAllowed` = flag `DckStub__full_module_download_allowed` (default false; jycg.java). WCC: 1=NFC, 2=+BLE, 3=+UWB. Sem config servida p/ o modelo → stub fica em defaults → módulo DCK completo nunca baixa.
+30. **O driver KSU backslashxx NÃO responde prctl de fora** (probe `0xDEADBEEF` retorna -1 até como root — `scripts/analysis/ksu_probe.c`; manager/ksud usam supercall/netlink) — vetor prctl de detecção é inócuo neste setup.
+31. **SuSFS é impossível em LKM** (patcheia VFS built-in; exige boot.img que o ABL rejeita; pesquisa 25/jul: ninguém distribui `.ko` com SuSFS porque é estruturalmente impossível; sus_su deprecated na v2). Rota de hide LKM: `kobject_del`+`list_del` no `kernelsu_init` (feito — fork `hide-lkm`).
+32. **Apps protegidos (DexProtector) renomeiam o processo** (`:p<hex>` — `pidof <pkg>` falha; usar `ps -A | grep <pkg>`), **escaneiam `/proc/self/maps`** atrás de segmentos executáveis extras (injeção zygisk = kill instantâneo via `MessageGuardException`, código DP: 786) e **enumeram pacotes via Binder raw** (bypass PackageManager). Revolut **faz key attestation local e valida o conteúdo** (TEESimulator#41: attestation malformada = crash).
 
 ---
 
@@ -313,6 +317,12 @@
 2. **BYD digital key — jornada completa até o veredito:** pesquisa desmontou o boato "Xiaomi 17 funciona" (hearsay; único sucesso real = BMW i4 + Xiaomi 17 base — BYD e BMW têm whitelists separadas; lista oficial do Google tem "17 & 17 Ultra", **não** 17 Pro Max). Spoof aurora (14 Ultra) via COW + **spoof `Build.*` JNI novo no módulo** em gms/wallet/app BYD (descoberta: match por nome de processo — fato 25; umount do BYD desligado p/ injetar) → bloqueio persistiu. **RE do app BYD + GMS:** check = `isCreateDigitalKeyPossible()` (GMS DCK); gates = `ro.gms.dck.eligible_wcc` (**setada=3, persistida**) + flag phenotype `DckStub__full_module_download_allowed` (**imbatível**: GMS produção não aplica overrides — fato 28). Testado até GMS Phixit. **Frente ENCERRADA com reversão completa** (config, prop, phenotype, Phixit, tmp) — aparelho voltou ao estado estável, PI 3/3, Petal ok.
 3. **Legado:** mapa do DCK no Parte 2.1/6.G, fatos 25–29, fontes gms analisadas em `analysis/byd/*.java`, DeviceID+ com 3º mecanismo de spoof (Build.* JNI).
 4. Quirks do dia: 2º device apareceu no adb (Redmi `f10c4f767d7b`, slot _b) — sempre conferir serial/modelo antes de comandos; jadx on-device fica em `/data/data/com.termux/files/usr/tmp/petal/jadx` (rodar com `sh .../bin/jadx` + java no PATH).
+
+### Sessão 10 (25/jul manhã — Revolut: forense completa + `.ko` com hide, não resolvido)
+1. **Diagnóstico:** vetores visíveis confirmados como uid do app: `/proc/modules` ksu, `/sys/module/ksu`, `/system/bin/su`. prctl inócuo (fato 30). SuSFS descartado (fato 31).
+2. **Testes que falharam:** adb root OFF (sem su), frida-server removido, manager congelado, SSAID novo + clear data, injeção per-app com spoof Pixel 10 (detectada pelo maps scan — fato 32).
+3. **`.ko` com hide buildado e flasheado:** fork `andersonlucasg3/KernelSU` + patch `9ea26f3` (`kobject_del`+`list_del`), build via GitHub Actions, `ksud boot-patch` no init_boot 317 stock, fastboot flash. Módulo invisível, KSU 32558 íntegro, boot normal. Rollback: re-flash `68f996d9`.
+4. **Pesquisa (veredito):** Revolut = DexProtector/Licel; **suspeito nº 1 = keybox vazada** (PI 3/3 não basta; Revolut rejeita keyboxes populares — XDA 4773849); caminhos documentados: keybox privada, HMA-OSS whitelist, TEESimulator. Frente pausada (Parte 2.4).
 
 ---
 
