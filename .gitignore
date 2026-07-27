@@ -26,3 +26,6 @@ tools/ksuinit
 
 # Binario de teste do componente zygisk (rebuild: native/build.sh test)
 modules/deviceidchanger/native/test_hook
+
+# Dependencias node (reinstalaveis via npm ci)
+node_modules/

@@ -1,0 +1,26 @@
+# Ignorar TUDO no diretório analysis/ytmusic-morphe/
+# exceto os arquivos explicitamente listados abaixo.
+# APKs, jars, dex, keystores, databases e jadx-outputs NÃO podem vazar.
+
+# 1) ignora arquivos e diretórios de primeiro nível
+/*
+/*/
+
+# 2) reabre só os diretórios com conteúdo permitido
+!/exp/
+!/frida/
+!/cli/
+
+# 3) ignora o conteúdo desses diretórios...
+exp/*
+frida/*
+cli/*
+
+# 4) ...exceto os arquivos permitidos
+!exp/REPORT.md
+!frida/run.py
+!frida/hook.js
+!cli/SignApk.java
+!cli/ReplaceDex.java
+!REPORT.md
+!.gitignore

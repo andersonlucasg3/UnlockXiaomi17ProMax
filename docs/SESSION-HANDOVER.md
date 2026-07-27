@@ -1,5 +1,5 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Documento vivo de continuidade entre sessões. Última atualização: 25/jul/2026 (pós-Sessão 10 — Revolut: forense completa, `.ko` com hide; suspeito nº1 = keybox). Unifica os antigos `SESSION-HANDOVER-2026-07-23.md` e `ESTADO-ATUAL-2026-07-23.md`. Histórico cronológico detalhado das sessões de 21–22/jul: `docs/relatorio-sessao-2026-07-22.md`.**
+**Documento vivo de continuidade entre sessões. Última atualização: 27/jul/2026 (Sessão 12 — YT Music Morphe no Android Auto ✅). Histórico cronológico detalhado: `docs/relatorio-sessao-2026-07-22.md` (21–22/jul, root KSU), `docs/relatorio-sessao-2026-07-27.md` (27/jul, YT Music AA).**
 
 ---
 
@@ -32,6 +32,7 @@
 | Revolut | ✅ **RESOLVIDO 27/jul ~11:35** — mesmo vetor/fix do bradseguros: HMA-OSS (Parte 2.5). Hipótese keybox vazada DESCARTADA |
 | Bradesco Seguros | ✅ **RESOLVIDO 27/jul ~11:20** — vetor: enumeração de pacotes; fix: HMA-OSS (Parte 2.5) |
 | **Petal Maps 4.7.0.319** | ✅ **RESOLVIDA 24/jul ~18:20** — COW prop_area validado: `Get Manufacturer: HUAWEI`, app passa do gate (Parte 2.2) |
+| **YT Music Morphe 9.15.51 (AA)** | ✅ **RESOLVIDO 27/jul** — podcasts funcionam no Android Auto; música exige YouTube Premium (server-side, ReVanced#6185). Fix: `tcn.c→false` (Dynamite bypass) + 37 patches CLI (Parte 2.6 / Sessão 12) |
 
 ### 1.4 Módulo DeviceID+ (fork próprio)
 - **Local:** `modules/deviceidchanger/` (fork AGPL de sidex15/deviceidchanger, créditos no README/LICENSE). Rebuild do zip: `native/build.sh` (o `.so`) + zip da pasta `module/` (zip gitignored; `build_zip.ps1` no Windows). Targets do build.sh: sem arg = módulo; `test` = smoke test `test_hook`; `inspect` = inspetor standalone em /data/local/tmp
@@ -342,6 +343,14 @@
 4. **Anti-tamper do daemon TS descoberto** (Parte 2.5 — lição): editar arquivos do módulo = daemon morre silencioso.
 5. **Revolut RESOLVIDO ~11:35** (usuário confirmou): mesmo template `bancos` aplicado via UI do HMA-OSS → app v10.140 passa. **Hipótese "keybox vazada" da Sessão 10 DESCARTADA** — o vetor era applist o tempo todo (com keybox DroidWin ativa e PI 3/3, o app funciona). Lição: DexProtector checa applist por Binder raw **antes** de qualquer attestation; HMA-OSS é prerequisito p/ apps Licel.
 
+### Sessão 12 (27/jul — YT Music Morphe no Android Auto ✅ RESOLVIDO)
+1. **Diagnóstico:** crash `Missing DynamiteApplicationContext` no `MediaBrowserService.onGetRoot` — o `GoogleCertificatesImpl` do GMS real exige `DynamiteApplicationContext` não inicializado (app usa microG). Patch Morphe oficial (`return true` em `kxo.m`) não basta com GMS real — o crash ocorre ANTES de `m()` ser avaliado, dentro de `tcn.c()`. Três builds sem o patch: bundle antigo, patch desmarcado na UI, OOM do patcher.
+2. **Fix validado:** `tcn.c(String) → return false` via cirurgia dex-only (baksmali/smali 3.0.9). Reporta "não-assinado" sem tocar no Dynamite; `kxo.g()` passa porque `!c() && !m()` = `false` com `m()` patcheado.
+3. **Build final:** CLI Morphe `--exclusive` 37 patches + fix dex-only → `install -r` com manager.keystore (BKS v2, storepass "", alias Morphe, keypass Morphe).
+4. **Veredito podcasts:** entitlement `khr.e()` já é patcheado, `skip_entitlement_check=true` p/ gearhead, árvore de browse vem do servidor (Innertube) — corte é **server-side** por tier de conta (ReVanced#6185). Música exige YouTube Premium no AA.
+5. **PR upstream:** https://github.com/MorpheApp/morphe-patches/pull/2239 — estende "Bypass certificate checks" com `IsGoogleSignedFingerprint` + `returnEarly(false)`. Fork andersonlucasg3, branch `fix/ytmusic-aa-dynamite-crash`.
+6. **Lições:** patcher OOM → reiniciar device antes de patchar APKs grandes; keystore do manager reutilizável (storepass vazia!); apktool corrompe resources → preferir dex-only; Frida 17 sem java-bridge → bundlar com esbuild; sempre conferir serial do device (Redmi `f10c4f767d7b` confundido com popsicle); frida-server é vetor de detecção → parar após uso.
+
 ### Sessão 10 (25/jul manhã — Revolut: forense completa + `.ko` com hide, não resolvido)
 1. **Diagnóstico:** vetores visíveis confirmados como uid do app: `/proc/modules` ksu, `/sys/module/ksu`, `/system/bin/su`. prctl inócuo (fato 30). SuSFS descartado (fato 31).
 2. **Testes que falharam:** adb root OFF (sem su), frida-server removido, manager congelado, SSAID novo + clear data, injeção per-app com spoof Pixel 10 (detectada pelo maps scan — fato 32).
@@ -362,3 +371,7 @@
 - Leitura de memória de outro processo: `process_vm_readv` (memread/memscan), NUNCA `dd` em `/proc/<pid>/mem` (retorna zeros — fato 22)
 - USAP pool: frente Petal fechada; reativação é decisão em aberto (deixar off não custa nada visível)
 - adb com device novo/desconhecido: conferir `ro.product.model` antes de qualquer comando (um Redmi apareceu como `f10c4f767d7b` na Sessão 9)
+- **Patcher OOM:** antes de patchear APKs grandes (>50 MB) no Morphe Manager, **reiniciar o device** (limpa RAM). O patcher aloca mmap proporcional ao APK (~1,3 GB p/ YT Music 80 MB)
+- **Keystore do Morphe Manager:** `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2), storepass **vazia**, alias `Morphe`, keypass `Morphe` — reutilizável p/ builds CLI com `install -r`
+- **apktool corrompe resources:** rebuilds via apktool quebram `resources.arsc` (crash `Resources$NotFoundException`). Preferir **cirurgia dex-only** (baksmali/smali + ReplaceDex.java) para patches pontuais
+- **Frida 17:** java-bridge foi removida do core → scripts precisam ser **bundlados com esbuild** (`frida-java-bridge`). `enumerate_processes()` pode não listar certos apps → usar `pidof` via adb + attach por PID. **Sempre parar frida-server após uso** (vetor de detecção para apps bancários)
