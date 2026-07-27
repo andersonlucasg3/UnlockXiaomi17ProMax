@@ -1,0 +1,16 @@
+{
+  "configVersion": 93,
+  "templates": {
+    "bancos": {
+      "isWhitelist": true,
+      "appList": []
+    }
+  },
+  "scope": {
+    "br.com.bradseg.bscelular": {
+      "useWhitelist": true,
+      "excludeSystemApps": true,
+      "applyTemplates": ["bancos"]
+    }
+  }
+}

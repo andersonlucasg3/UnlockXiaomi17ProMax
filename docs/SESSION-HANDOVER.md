@@ -19,6 +19,7 @@
 - **PlayIntegrityFork v17** com `custom.pif.prop` = **Pixel 10 (frankel, Canary ZP11.260618.005 — expira 2026-08-19, rodar Action do PIF p/ renovar)**
 - **TrickyStore v1.4.1** (keybox DroidWin v3.6 + security_patch.txt=2026-07-05; target.txt inclui os 3 pacotes Caixa + `br.com.gabba.Caixa`)
 - **Umount global** (exceto gms/vending/termux **e `com.huawei.maps.app`** — ver Parte 5, fato 16). **App BYD:** umount foi desligado na Sessão 9 p/ injeção (frente DCK) — re-ligar no manager se ainda não foi
+- **HMA-OSS oss-164** (instalado 27/jul — Parte 2.5): filtra applist no system_server; template `bancos` (whitelist vazio) aplicado a `br.com.bradseg.bscelular` e `com.revolut.revolut`; config em `/data/misc/hide_my_applist_hmaosspreseedab/config.json`
 - **COPG 5.9.0** — **REMOVIDO pelo usuário em 24/jul** (DeviceID+ COW cobre o caso Petal; era cinto-e-suspensório)
 - **Play Integrity: 3/3 ✅**
 
@@ -28,7 +29,8 @@
 | Google Wallet | ✅ |
 | BYD | ✅ |
 | Caixa / bancos BR | ✅ **RESOLVIDA 23/jul ~21h** (Parte 3) |
-| Revolut | ❌ (Parte 2.4 — forense completa; suspeito nº1: keybox vazada) |
+| Revolut | ✅ **RESOLVIDO 27/jul ~11:35** — mesmo vetor/fix do bradseguros: HMA-OSS (Parte 2.5). Hipótese keybox vazada DESCARTADA |
+| Bradesco Seguros | ✅ **RESOLVIDO 27/jul ~11:20** — vetor: enumeração de pacotes; fix: HMA-OSS (Parte 2.5) |
 | **Petal Maps 4.7.0.319** | ✅ **RESOLVIDA 24/jul ~18:20** — COW prop_area validado: `Get Manufacturer: HUAWEI`, app passa do gate (Parte 2.2) |
 
 ### 1.4 Módulo DeviceID+ (fork próprio)
@@ -130,8 +132,23 @@
 
 ### 2.3 Instalar DeviceID+ v2.1.1 no aparelho — ✅ FEITO 24/jul ~18:17
 
+### 2.5 Bradesco Seguros `br.com.bradseg.bscelular` (✅ RESOLVIDO 27/jul ~11:20 — HMA-OSS)
+**Sintoma:** mesma tela de bloqueio do Revolut ("ambiente não seguro", diálogo com OK). App instalado 27/jul 08:27 (v2.85.0).
+
+**Fatos provados:**
+- **Protetor = DexProtector/Licel** (`lib/arm64-v8a/libdexprotector.so` no split arm64). Processo renomeado `:p<hex>` (fato 32). APKs e logs em `analysis/bradseguros/`.
+- **Estava AUSENTE do target.txt do TrickyStore** (Revolut está). Adicionado 27/jul ~09:44 — **sem efeito no veredito**.
+- **Após `pm clear`: crash com `android.app.TerminateException$<obfuscado>`** (FATAL EXCEPTION main — kill deliberado do DexProtector) — **com E sem o daemon TS no ar** (attestation spoofada não muda o veredito; TEE real idem).
+- **App NÃO cria aliases no keystore** (nada do uid 10363 em `/data/misc/keystore/user_0/`) → attestation local persistente improvável.
+- **Pacotes root visíveis instalados:** `me.weishu.kernelsu` (manager), `com.termux`, `app.morphe.manager`, `app.pwhs.universalinstaller` (enumeração via Binder raw é vetor candidato nº1; fato 32).
+- RE do APK em andamento (decompilação `analysis/bradseguros/out/`) + pesquisa de hide de pacotes sem Xposed.
+
+**RESOLUÇÃO (27/jul ~11:20, confirmada pelo usuário — "Funcionou"):** **HMA-OSS oss-164** (zip em `tools/hma_oss/`, sha256 `4bf157db…`, id `hma_oss_zygisk`, manager `org.frknkrc44.hma_oss`) filtra a applist no system_server (cobre Binder raw). Config em `/data/misc/hide_my_applist_hmaosspreseedab/config.json` (o serviço reusa o 1º dir `hide_my_applist*` que encontra em /data/misc; foi pré-semeada e ele adotou): template `bancos` = whitelist vazio (app-alvo não vê NENHUM user app) + scope por app. **Lições HMA-OSS:** (1) config só aplica AO VIVO via manager app (ServiceClient — o serviço lê o arquivo só no boot; editar o JSON em disco sem passar pelo manager não tem efeito); (2) "Ativar" sozinho cria scope em **blacklist vazio (= não esconde nada)** — é preciso ligar o modo "Esconder" (whitelist) E aplicar o template; (3) formato decodificado do fonte (`JsonConfig.kt`, CONFIG_VERSION=93); (4) log em `<datadir>/log/runtime.log` mostra `@shouldFilterApplication: query from <pkg>` — prova da filtragem. **Revolut:** mesmo fix aplicado ~11:35 (usuário confirmou) — hipótese keybox descartada (Parte 2.4).
+
+**⚠️ Lição TrickyStore (27/jul):** o daemon TS tem **anti-tamper** — verifica integridade dos arquivos do módulo; editar `service.sh` (ex.: DEBUG=true) faz o daemon morrer com **exit 1 silencioso**. NUNCA editar arquivos do módulo TS. Reinício manual do daemon: `cd /data/adb/modules/tricky_store && (setsid sh ./service.sh >/data/local/tmp/ts.log 2>&1 </dev/null &)`. NUNCA `pkill -f TrickyStore` via adb shell (a cmdline do próprio shell contém a string — mata o shell).
+
 ### 2.4 Dívidas técnicas documentadas
-- **Revolut (Sessão 10, 25/jul — diagnóstico completo, não resolvido):** splash "ambiente não é seguro" (veredito LOCAL do RASP, DexProtector/Licel confirmado por pesquisa). Eliminados como causa: mounts, PI 3/3, attestation TS, `/system/bin/su` (adb root off), frida-server, `/proc/modules`+`/sys/module` ksu (**resolvido permanentemente via `.ko` com hide — ver 1.2**), `/proc/kallsyms` (limpo), prctl (driver não responde — fato 30), ADB, SSAID novo + clear data, manager congelado. **Injeção zygisk no app é INVIÁVEL** (maps scan → `MessageGuardException` instantâneo). **Suspeito nº 1 (pesquisa): keybox vazada DroidWin — Revolut rejeita keyboxes populares mesmo com PI 3/3** (guia XDA 4773849: PI 3/3 + keybox queimada = bloqueio; trocar keybox = volta). Próximos passos: (1) keybox privada/não-vazada; (2) HMA-OSS/HMAL whitelist (DexProtector enumera pacotes via Binder raw); (3) TEESimulator (atenção: attestation malformada = MessageGuard); (4) attestation↔Build consistency (frankel×Xiaomi) é hipótese plausível não confirmada. SuSFS = **estruturalmente impossível neste device** (VFS built-in, exige boot.img — fato 31).
+- **Revolut (✅ RESOLVIDO 27/jul ~11:35 — Sessão 11; diagnóstico da Sessão 10 abaixo mantido como referência):** a causa real era **enumeração de pacotes** (não a keybox!) — resolvido com HMA-OSS, template `bancos` (Parte 2.5). Nota: o app foi atualizado p/ 10.140 no dia, mas a variável decisiva foi a applist (query filtrada logada + app passou). **Texto original da Sessão 10:** splash "ambiente não é seguro" (veredito LOCAL do RASP, DexProtector/Licel confirmado por pesquisa). Eliminados como causa: mounts, PI 3/3, attestation TS, `/system/bin/su` (adb root off), frida-server, `/proc/modules`+`/sys/module` ksu (**resolvido permanentemente via `.ko` com hide — ver 1.2**), `/proc/kallsyms` (limpo), prctl (driver não responde — fato 30), ADB, SSAID novo + clear data, manager congelado. **Injeção zygisk no app é INVIÁVEL** (maps scan → `MessageGuardException` instantâneo). **Suspeito nº 1 (pesquisa): keybox vazada DroidWin — Revolut rejeita keyboxes populares mesmo com PI 3/3** (guia XDA 4773849: PI 3/3 + keybox queimada = bloqueio; trocar keybox = volta). Próximos passos: (1) keybox privada/não-vazada; (2) HMA-OSS/HMAL whitelist (DexProtector enumera pacotes via Binder raw); (3) TEESimulator (atenção: attestation malformada = MessageGuard); (4) attestation↔Build consistency (frankel×Xiaomi) é hipótese plausível não confirmada. SuSFS = **estruturalmente impossível neste device** (VFS built-in, exige boot.img — fato 31).
 - **Keybox treadmill:** trocar `/data/adb/tricky_store/keybox.xml` quando revogar + reboot
 - **Print do PIF expira 2026-08-19:** rodar Action do PIF para renovar antes
 - **Atualizador de apps de sistema:** RESOLVIDO — usuário desinstalou o app de update (era by design, assinatura EU ≠ Xiaomi — ver Parte 6.E)
@@ -317,6 +334,13 @@
 2. **BYD digital key — jornada completa até o veredito:** pesquisa desmontou o boato "Xiaomi 17 funciona" (hearsay; único sucesso real = BMW i4 + Xiaomi 17 base — BYD e BMW têm whitelists separadas; lista oficial do Google tem "17 & 17 Ultra", **não** 17 Pro Max). Spoof aurora (14 Ultra) via COW + **spoof `Build.*` JNI novo no módulo** em gms/wallet/app BYD (descoberta: match por nome de processo — fato 25; umount do BYD desligado p/ injetar) → bloqueio persistiu. **RE do app BYD + GMS:** check = `isCreateDigitalKeyPossible()` (GMS DCK); gates = `ro.gms.dck.eligible_wcc` (**setada=3, persistida**) + flag phenotype `DckStub__full_module_download_allowed` (**imbatível**: GMS produção não aplica overrides — fato 28). Testado até GMS Phixit. **Frente ENCERRADA com reversão completa** (config, prop, phenotype, Phixit, tmp) — aparelho voltou ao estado estável, PI 3/3, Petal ok.
 3. **Legado:** mapa do DCK no Parte 2.1/6.G, fatos 25–29, fontes gms analisadas em `analysis/byd/*.java`, DeviceID+ com 3º mecanismo de spoof (Build.* JNI).
 4. Quirks do dia: 2º device apareceu no adb (Redmi `f10c4f767d7b`, slot _b) — sempre conferir serial/modelo antes de comandos; jadx on-device fica em `/data/data/com.termux/files/usr/tmp/petal/jadx` (rodar com `sh .../bin/jadx` + java no PATH).
+
+### Sessão 11 (27/jul manhã — Bradesco Seguros ✅ RESOLVIDO via HMA-OSS)
+1. **Diagnóstico:** app v2.85.0 = DexProtector/Licel (mesmo protetor do Revolut); processo renomeado `:p<hex>`; tela de bloqueio na 1ª execução, crash `TerminateException` após `pm clear` (o crash é BAL_BLOCK do A16: o diálogo de bloqueio não consegue abrir em cold start).
+2. **Vetor raiz:** enumeração de pacotes — digest pós-crash nomeia `me.weishu.kernelsu`; telemetria do app diz `isRoot:false` (não é root clássico nem attestation — app não cria aliases no keystore; crash idêntico com TS up/down). RE do APK + pesquisa por subagentes (DexProtector enumera via Binder raw — Romain Thomas jan/2026).
+3. **Fix:** HMA-OSS oss-164 instalado + config pré-semeada (template `bancos` whitelist vazio; scope bradseguros) → reboot → **app FUNCIONA (usuário confirmou ~11:20)**.
+4. **Anti-tamper do daemon TS descoberto** (Parte 2.5 — lição): editar arquivos do módulo = daemon morre silencioso.
+5. **Revolut RESOLVIDO ~11:35** (usuário confirmou): mesmo template `bancos` aplicado via UI do HMA-OSS → app v10.140 passa. **Hipótese "keybox vazada" da Sessão 10 DESCARTADA** — o vetor era applist o tempo todo (com keybox DroidWin ativa e PI 3/3, o app funciona). Lição: DexProtector checa applist por Binder raw **antes** de qualquer attestation; HMA-OSS é prerequisito p/ apps Licel.
 
 ### Sessão 10 (25/jul manhã — Revolut: forense completa + `.ko` com hide, não resolvido)
 1. **Diagnóstico:** vetores visíveis confirmados como uid do app: `/proc/modules` ksu, `/sys/module/ksu`, `/system/bin/su`. prctl inócuo (fato 30). SuSFS descartado (fato 31).
