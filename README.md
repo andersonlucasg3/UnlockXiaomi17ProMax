@@ -2,14 +2,16 @@
 
 Unlocking, xiaomi.eu ROM and root (KernelSU LKM) project for the **Xiaomi 17 Pro Max** (codename `popsicle`, Snapdragon 8 Elite Gen 5, HyperOS 3 / Android 16).
 
-## Current status (27/Jul/2026)
+📖 **[HOW TO UNLOCK — step-by-step guide →](HOW_TO_UNLOCK.md)** (bootloader unlock → xiaomi.eu → KernelSU LKM → hiding stack)
+
+## Current status (28/Jul/2026)
 
 - **ROM:** xiaomi.eu **OS3.0.317.0.WPBCNXM** (pt-BR + GMS), bootloader unlocked
 - **Root:** KernelSU **LKM** (driver backslashxx 32558) on `init_boot` — kernel **stock, untouched**
 - **Stack:** ZygiskNext 1.4.3 (enforce) + PlayIntegrityFork v17 + TrickyStore v1.4.1 (keybox DroidWin) + umount global (except gms/vending/Termux)
 - **Result:** Play Integrity 3/3, Google Wallet ✅, BYD ✅, Caixa ✅, **Petal Maps 4.7.0.319 ✅** (spoof prop_area COW), Revolut ✅ (HMA-OSS), Bradesco Seguros ✅ (HMA-OSS), **YT Music Morphe ✅ Android Auto (podcasts; music requires Premium server-side)** — see `docs/SESSION-HANDOVER.md`
-- **Custom module:** DeviceID+ v2.1.1 installed (`modules/deviceidchanger/`, AGPL fork of sidex15) — per-app SSAID, global and per-app prop spoofing (COW prop_area + GOT hooks + **`android.os.Build.*` via JNI**, v2.2.0-dev validated), TrickyStore editor
-- **BYD digital key:** terminated (24/Jul) — GMS DCK `downloadAllowed` gate with no known workaround; full mechanism map in the handover (Part 2.1) and `analysis/byd/`
+- **Custom module:** DeviceID+ **v2.3.1** installed (`modules/deviceidchanger/`, AGPL fork of sidex15) — per-app SSAID, global and per-app prop spoofing (COW prop_area + GOT hooks + **`android.os.Build.*` via JNI**), native DCK hook (passive, for BYD digital key), TrickyStore editor
+- **BYD digital key:** 🔄 **REOPENED 28/Jul** — DeviceID+ v2.3.1 native hook deployed, validation pending; full mechanism map in the handover (Part 2.1) and `analysis/byd/`
 
 ## Repository structure
 
