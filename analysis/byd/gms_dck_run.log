@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\frida-agent\run_gms_dck.py", line 29, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\frida-agent\run_gms_dck.py", line 11, in main
+    session = dev.attach(TARGET)
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\venv-frida16\Lib\site-packages\frida\core.py", line 86, in wrapper
+    return f(*args, **kwargs)
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\venv-frida16\Lib\site-packages\frida\core.py", line 1071, in attach
+    return Session(self._impl.attach(self._pid_of(target), **kwargs))  # type: ignore
+                                     ~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\venv-frida16\Lib\site-packages\frida\core.py", line 1193, in _pid_of
+    return self.get_process(target).pid
+           ~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\venv-frida16\Lib\site-packages\frida\core.py", line 86, in wrapper
+    return f(*args, **kwargs)
+  File "C:\Users\anderson\Projetos\UnlockXiaomi\tools\venv-frida16\Lib\site-packages\frida\core.py", line 960, in get_process
+    for process in self._impl.enumerate_processes()
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+frida.ProcessNotFoundError: unable to find process with name 'system_server'

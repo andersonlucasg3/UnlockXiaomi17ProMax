@@ -17,6 +17,7 @@
 
 #include "zygisk.hpp"
 #include "perapp_hooks.h"
+#include "dck_hook.h"
 
 #define LOG_TAG "DeviceIDPlus"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -54,6 +55,13 @@ public:
         if (cow > 0) LOGI("cow: %d prop(s) applied", cow);
         perapp_install_hooks();
         spoof_build_fields();
+        if (dck_hook_enabled_) {
+            JavaVM *vm = NULL;
+            if (env->GetJavaVM(&vm) == JNI_OK && vm) {
+                LOGI("byd-dck: dck.hook=1 in config, starting lazy hook");
+                dck_hook_start(vm);
+            }
+        }
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
@@ -63,6 +71,7 @@ public:
 private:
     zygisk::Api *api;
     JNIEnv *env;
+    bool dck_hook_enabled_ = false; /* config key "dck.hook=1" (BYD only) */
 
     /* Rewrite the matching static fields of android.os.Build with the spoof
      * values. The Build class is initialized once in the zygote, so every app
@@ -152,7 +161,17 @@ private:
                     char *eq = strchr(kv, '=');
                     if (eq && eq != kv) { /* need a non-empty key */
                         *eq = '\0';
-                        if (perapp_add(kv, eq + 1) == 0) any = true;
+                        /* Module-control key, not a property spoof: enable the
+                         * BYD DCK Java hook for this package only. */
+                        if (strcmp(kv, "dck.hook") == 0) {
+                            if (strcmp(eq + 1, "1") == 0) {
+                                dck_hook_enabled_ = true;
+                                any = true;
+                            }
+                            /* never goes into the prop table */
+                        } else if (perapp_add(kv, eq + 1) == 0) {
+                            any = true;
+                        }
                     }
                 }
             }

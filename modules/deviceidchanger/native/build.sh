@@ -16,7 +16,7 @@ OUT=../module/zygisk/arm64-v8a.so
 mkdir -p ../module/zygisk
 # shellcheck disable=SC2086
 clang++ -shared -fPIC $CXXFLAGS -nostdlib++ \
-    -o "$OUT" deviceid_zygisk.cpp perapp_hooks.cpp prop_cow.cpp \
+    -o "$OUT" deviceid_zygisk.cpp perapp_hooks.cpp prop_cow.cpp dck_hook.cpp \
     $LIBS -Wl,-s
 
 echo "== DT_NEEDED of $OUT =="

@@ -29,3 +29,6 @@ modules/deviceidchanger/native/test_hook
 
 # Dependencias node (reinstalaveis via npm ci)
 node_modules/
+
+# frida-server binaries (download: github.com/frida/frida/releases)
+tools/frida-server*

@@ -1,5 +1,5 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Living continuity document between sessions. Last updated: 27/Jul/2026 (Session 12 — YT Music Morphe on Android Auto ✅). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA).**
+**Living continuity document between sessions. Last updated: 28/Jul/2026 (Session 13 — BYD digital key front REOPENED; DeviceID+ v2.3.1 with native DCK hook). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK).**
 
 ---
 
@@ -19,7 +19,7 @@
 - **PlayIntegrityFork v17** with `custom.pif.prop` = **Pixel 10 (frankel, Canary ZP11.260618.005 — expires 2026-08-19, run PIF Action to renew)**
 - **TrickyStore v1.4.1** (keybox DroidWin v3.6 + security_patch.txt=2026-07-05; target.txt includes the 3 Caixa packages + `br.com.gabba.Caixa`)
 - **Umount global** (except gms/vending/termux **and `com.huawei.maps.app`** — see Part 5, fact 16). **BYD app:** umount was turned off in Session 9 for injection (DCK front) — re-enable in manager if not yet done
-- **HMA-OSS oss-164** (installed 27/Jul — Part 2.5): filters applist in system_server; `bancos` template (empty whitelist) applied to `br.com.bradseg.bscelular` and `com.revolut.revolut`; config at `/data/misc/hide_my_applist_hmaosspreseedab/config.json`
+- **HMA-OSS oss-164** (installed 27/Jul — Part 2.5): filters applist in system_server; `bancos` template (empty whitelist) applied to `br.com.bradseg.bscelular` and `com.revolut.revolut`; config at `/data/misc/hide_my_applist_hmaosspreseedab/config.json`. Zip in `tools/hma_oss/`. **NOT yet configured for BYD app** (BYD has root detection since v2.9.1 — Shamiko recommended by Niek/BYD-re, but Shamiko doesn't load on ZN 1.4.3; HMA-OSS is the alternative)
 - **COPG 5.9.0** — **REMOVED by user on 24/Jul** (DeviceID+ COW covers the Petal case; was belt-and-suspenders)
 - **Play Integrity: 3/3 ✅**
 
@@ -32,10 +32,12 @@
 | Bradesco Seguros | ✅ **RESOLVED 27/Jul ~11:20** — vector: package enumeration; fix: HMA-OSS (Part 2.5) |
 | **Petal Maps 4.7.0.319** | ✅ **RESOLVED 24/Jul ~18:20** — COW prop_area validated: `Get Manufacturer: HUAWEI`, app passes the gate (Part 2.2) |
 | **YT Music Morphe 9.15.51 (AA)** | ✅ **RESOLVED 27/Jul** — podcasts work on Android Auto; music requires YouTube Premium (server-side, ReVanced#6185). Fix: `tcn.c→false` (Dynamite bypass) + 37 CLI patches (Part 2.6 / Session 12) |
+| **BYD digital key** | 🔄 **REOPENED 28/Jul** — DeviceID+ v2.3.1 native DCK hook deployed; validation pending (Part 2.1). App itself runs without crash since KSU migration |
 
 ### 1.4 DeviceID+ Module (own fork)
 - **Location:** `modules/deviceidchanger/` (AGPL fork of sidex15/deviceidchanger, credits in README/LICENSE). Zip rebuild: `native/build.sh` (the `.so`) + zip the `module/` folder (zip gitignored; `build_zip.ps1` on Windows). build.sh targets: no arg = module; `test` = smoke test `test_hook`; `inspect` = standalone inspector in /data/local/tmp
-- **Versions:** v2.1.1 **installed on device 24/Jul ~18:17** (zip rebuilt **with the COW `.so` included** — the old zip lacked the `.so` and would have removed the spoof on update; the deployed `.so` was pulled from the device into `module/zygisk/arm64-v8a.so` before rebuild) + live config re-merged into staged. **Native v2.2.0-dev: prop_area COW VALIDATED 24/Jul ~18:20 (Petal) + `Build.*` spoof via JNI added and deployed ~19:50 (hash `06dcaf4c…`)** — field-validated on gms/BYD app (DCK front) and on Petal (23:21). Pending: bump v2.2.0 + native commit (prop_cow.cpp, Build.* JNI etc., still uncommitted)
+- **Current version: v2.3.1** (versionCode 2003001), deployed 28/Jul. Adds **native DCK hook** (`native/dck_hook.{cpp,h}`): passive `FindClass("com/google/android/gms/dck/internal/zzfa")` with `ExceptionClear` in 250ms poll after 1.5s grace delay, hooks `isCreateDigitalKeyPossible()→true`. Controlled by `dck.hook=1` in `.perapp_props`. **Validation pending** — see Part 2.1.
+- **v2.2.0-dev (24/Jul):** prop_area COW VALIDATED (Petal) + `Build.*` spoof via JNI — field-validated on gms/BYD app and Petal. Native commit for v2.2.0 (prop_cow.cpp, Build.* JNI etc.) still uncommitted (overlapped by v2.3.x DCK work).
 - **Features:** Per-app SSAID (lists all packages, checkbox enroll, shared global ID OR custom per app, regen for both, backup/restore + anti-bootloop validation) · persistent global prop spoof (service.sh post-boot, `ro.build.host=c3-miui-ota-bd110`) · **per-app prop spoof** — three complementary mechanisms: (1) **prop_area COW** (`prop_cow.cpp`: copies prop pages to a private mapping and rewrites the value in-place using bionic's serial protocol — covers ALL read paths: JNI, native, direct parse, static-linked); (2) GOT/PLT hook of the 3 bionic functions (`perapp_hooks.cpp`, complement for dynamic readers); (3) **`android.os.Build.*` spoof via JNI** (`deviceid_zygisk.cpp`: rewrites the MODEL/DEVICE/PRODUCT/BRAND/MANUFACTURER/etc. static fields in the app process in postSpecialize — needed because the Build class is initialized in the zygote with the real values and neither COW nor hooks reach it; same technique as PIF). Flat config `.perapp_props` lines `pkg|key=value` — **matched by PROCESS NAME (nice_name), not package** (fact 25); applied with app force-stop, no reboot; stealth unload on non-target apps · TrickyStore target.txt editor
 - **⚠️ KSU module update overwrites the entire dir** (`/data/adb/modules/deviceidchanger/`) → always re-merge `config.json` + `.props_*` + `.perapp_props` into staged (`/data/adb/modules_update/...`) before reboot
 - **⚠️ NEVER hot-swap the zygisk `.so`** — ZN caches the entry offset in the zygote; swapping the file without reboot crashes every injected app (fact 20)
@@ -59,52 +61,57 @@
 
 ## PART 2 — PENDING ITEMS
 
-### 2.1 BYD digital key (⏸️ CLOSED 24/Jul ~23:30 — client-side exhausted; verdict: Google gate with no known workaround)
-**Goal:** provision the BYD digital key (Destroyer 05/King BR) on the phone. **Final state: blocked at GMS DCK `downloadAllowed` — production GMS does not apply phenotype overrides through any channel (all tested); server does not serve DCK config for this model. Full rollback performed** (see end of Session 9). Lasting legacy: DeviceID+ with `Build.*` spoof (JNI), `ro.gms.dck.eligible_wcc` prop documented, and the full DCK map below. If Google ever whitelists this model, resume from here.
+### 2.1 BYD digital key (🔄 REOPENED 28/Jul — Session 13; DeviceID+ v2.3.1 native DCK hook deployed, validation pending)
+**Goal:** provision the BYD digital key (Destroyer 05/King BR) on the phone. **Current state: v2.3.1 passive native hook deployed, `dck.hook=1` armed, umount OFF for BYD — awaiting final validation.** The phenotype route was exhausted in Session 9 (production GMS does not apply overrides). The new strategy bypasses the `downloadAllowed` gate entirely: hook `isCreateDigitalKeyPossible()→true` in the app process via Zygisk, exploiting the fact that the compatibility verdict is local (GMS DCK stub) + memoized in MMKV.
+
+**New discoveries (Session 13 — 28/Jul ~21:10 → 29/Jul ~01:00):**
+
+**Frida is inviable on both processes:**
+- **BYD app:** protected by **DexProtector** (Licel) — refuses to decrypt its own code under ptrace/Frida. Process dies with SIGSEGV ~3–5s after attach. Not a hookable detector; fundamental code protection incompatibility.
+- **GMS** (`com.google.android.gms`, NOT `.persistent`): internal **anti-Frida selfchecker** → SIGSEGV → crash loop → device reboot. `bsog.b()` (eligibility gate) is **AOT-inlined by dex2oat** — Java hooks don't fire during init. Module download is decided by Chimera's `ModuleInstallService` through `gtwx`/`gtvd` registry (independent of phenotype). **Frida-on-GMS ABANDONED as destructive.**
+
+**MMKV eligibility cache — game-changer discovery:**
+- Path: `/data/data/com.byd.bydautolink/files/mmkv/NFC_CACHE_FILE<VIN>` (+ `.crc`)
+- Format: MMKV (Tencent), **not encrypted**. Keys: `isWCC3` (dialog verdict), `isHaveLocalKey`, `isShowEnter`.
+- Behavior: pure memoization. Deleting the file forces re-evaluation on next flow entry.
+- **Strategic implication:** the "incompatible" dialog verdict is **LOCAL** (GMS DCK stub), not from the BYD backend. If we make `isCreateDigitalKeyPossible()` return `true`, the app caches `isWCC3=true` and proceeds — no need to defeat the BYD backend at this stage.
+
+**Concrete DCK client class:** `com.google.android.gms.dck.internal.zzfa` — the class behind `DigitalKeyFramework.getClient()`. Knowing the exact name enables targeted native hooking without loading the full module.
+
+**DCK module APK unfindable:** `dl-Dck.optional_*.apk` is classified "optional" by Chimera → not in factory images, not on APKMirror, no public dumps. Only source would be extraction from a DCK-enabled device (user's Galaxy S24 = Samsung Wallet path, not Google DCK).
+
+**Web research (3 agents):** zero public cases of DCK eligibility bypass on unsupported devices (XDA, Reddit, dolphinbyd, GitHub). Full flow: app → backend BYD (`dilinkappoversea-eu.byd.auto`, dynamic model list) → Google Wallet (eSE) → CCC R3 provisioning with RKP/key attestation → NFC pairing.
+
+**DeviceID+ v2.3.x — native Zygisk DCK hook (the remaining route):**
+- **v2.3.0** (aggressive): lazy thread, flip-to-native (`kAccNative`), `Tasks.forResult(Boolean.TRUE)`. Won the race but **crashed the flow** — SIGSEGV at `ExecuteNterpImpl+324`. A/B-proven: the hook forced DCK class loading/decompilation ahead of schedule, destabilizing DexProtector.
+- **v2.3.1** (passive, current): no `loadClass`/`getClient`. Only `FindClass("com/google/android/gms/dck/internal/zzfa")` with `ExceptionClear` in 250ms poll after **1.5s grace delay**. Only hook: `isCreateDigitalKeyPossible→true`. Controlled by `dck.hook=1` in `.perapp_props`. `.so` 17880 bytes. versionCode 2003001.
+- **Validation pending:** force-stop BYD → open → 30s crash check on DigitalKeyHomeActivity → delete MMKV (backup in `backup/byd-mmkv-2026-07-28/`) → "Add digital key" → verify `intercepted` log + `isWCC3=true` in new MMKV.
+
+**Incidents (Session 13):**
+- **Bootloop ~00:07:** during GMS Frida crash loop, device rebooted. Recovered with old `.so`. Umount for BYD re-enabled by recovery → user turned it OFF again. `dck.hook` temporarily removed as precaution, then re-armed.
+- **Play Protect "risky app" flag:** triggered during Frida-GMS session → monitor PI for server-side consequences.
+
+**KSU umount caveat:** the "Umount modules" toggle per app controls ZygiskNext injection. Lives in `/data/adb/ksu/.allowlist` (binary, flag at offset `f272`, stride `784`). **Bootloop/recovery can revert this setting** — always verify after incidents.
+
+---
+
+**▶ Historical (Sessions 7–9, 24/Jul/2026 — preserved for reference):**
 
 **Facts (device):**
 - Hardware OK (verified on device): `nfc.ese` + `nfc.uicc` + OMAPI (`android.hardware.se.omapi.ese.xml`), `android.hardware.uwb`, HAL `secure_element-service.qti` and `com.android.se` running
-- **Experiment applied:** PIF `action.sh` run → gms/vending now = **Pixel 10 (frankel)** via `/data/adb/modules/playintegrityfix/custom.pif.prop`
-- **Experiment rollback:** delete `custom.pif.prop` + force-stop gms/vending (PIF falls back to internal defaults that gave PI 3/3)
-- ⚠️ Check Play Integrity after retest (new print may change the verdict)
 
-**Research on 24/Jul (conclusions — sources: support.google.com/wallet/answer/12060041, /11358016, /13037118, byd.com/br/chave-digital, byd.com/eu, dolphinbyd.com.br forum threads 4976/2935, Reddit r/BYD 1on9yem/1uhy20t/1usp25c):**
-- **The block is from Google Wallet/Google, server-side, by model+ROM** — NOT region (BR is supported by the BYD app) nor integrity. The public list is short ("Pixel 6+, S21+, and some Android 12+") but the real one is server-side and unpublished; toggles server-side without app update (evidence: Xiaomi 15T Pro and 15 Ultra started working overnight).
-- **Depends on Google's "digital key API" embedded in the ROM by the OEM** — Xiaomi only included it in recent HyperOS builds, model by model ("The HyperOS update to 3.0.3 enables Google's digital key API"). **Real risk: xiaomi.eu may not include this API** (and Lineage/Graphene/Huawei don't have it).
-- Hardware: NFC+eSE is enough; **UWB is optional** — BYD is NFC-only (all BYDs on the Wikipedia table are "NFC"; homologated Xiaomis 12→14 don't have UWB).
-- BYD's actual list (BR forum, Apr/2025): Samsung S20→S25/Note20/Z/A56/A36, **Xiaomi 12/12 Pro/13/13 Pro/13 Ultra/13T/13T Pro/14/14 Ultra**, OPPO Find X8/Pro. **No Xiaomi 17** — 17/17 Ultra owners on Reddit say it still doesn't work (but there is an isolated report of a 17 working).
-- Restriction is **dual**: device must be on Google's list AND BYD's list. The error in our case comes from the Wallet step = Google block.
-- **PIF spoof to Pixel 10 does not solve it**: injects Build.* only in DroidGuard/attestation; car key eligibility is decided server-side against the real model that GMS reports.
-- **No documented workaround** (LSPosed/prop spoof) with proven success for car key — uncharted territory.
-- Risk even if provisioned: silent key revocation on integrity re-checks (BMW + Xiaomi 15 case).
-- **Samsung Wallet route DISPROVEN (research 24/Jul, 3 agents):** Samsung Wallet requires Galaxy hardware + One UI framework + server-side validated Samsung account (rejects non-Samsung since 2022, "ID not valid"); Samsung digital key lives in Galaxy eSE with Knox attestation (unique SAK per device in TrustZone, tied to IMEI+serial — NO batch keybox like TrickyStore for Samsung); KnoxPatch (state of the art, Samsung hardware only) marks Wallet/Pay as ❌ ("checks run in TEE, signed trustlets — requires TrustZone exploit"); key sharing from a Galaxy to the Xiaomi fails (recipient is also server-side checked). Sources: github.com/salvogiangri/KnoxPatch (+issue #43), docs.samsungknox.com/dev/knox-attestation, xda-developers.com/samsung-pay-not-working-non-samsung-phones, news.samsung.com (Digital Key = eSE), dolphinbyd t/4976.
-- **🆕 "Xiaomi 17 works" signal DEBUNKED (deep research 24/Jul):** the r/BYD post was **hearsay** (Vivo X300 thread, 28/Jun: "I saw a recent post...", no link/model/ROM). There is NO first-hand report of BYD working on any Xiaomi 17 as of 24/Jul — only failures (17 and 17 Ultra with BYD M6, Mar/Apr/2026). The only real success case is **BMW i4 + Xiaomi 17 base via Google Wallet** (May/2026, r/BMWI4 1t5p111): proves that Google's digital key API EXISTS on the 17 family and that Google has already whitelisted the 17 base. **Google's official list (android.com/digital-car-key, verified 24/Jul): "Xiaomi 12&12 Pro, 13…, 15&15 Ultra, 15T&15T Pro, 17 & 17 Ultra, MIX Flip, Poco F7/F8 Ultra" — does NOT include 17 Pro or 17 Pro Max** (popsicle is a China-only model, 2509FPN0BC, no Global variant). Whitelist is per model+manufacturer; BYD and BMW are separate lists. There is no AOSP feature (`android.hardware.digital_key` does not exist) — DCK lives 100% in Play services/Wallet and eligibility is server-side by model identity. Server-side flips happen (15T Pro Uruguay flipped ~08/Jul without update). **Open: test whether PIF spoofing gms to a whitelisted model (17 base or 17 Ultra, not Pixel) moves the Wallet gate** — eligibility reads the identity GMS reports; PIF already injects gms/vending.
-**Progress 24/Jul evening (Session 9 — BYD app RE + DCK gating discovered):**
-- **BYD app RE** (decompiled sources in `analysis/byd/out2/sources/`): the compatibility check calls `DigitalKeyFramework.getClient(ctx).isCreateDigitalKeyPossible()` — **the verdict comes from GMS (Google's DCK module)**, not a local list. The app only sends `deviceManufacturer` (code: xiaomi=0002, via Build.MANUFACTURER — already correct) to BYD. The "supported models" screen is the `catalogPage` help page opened when the GMS check fails. Main logic obfuscated via JNI (`com.fort.andjni`).
-- **DCK gating in GMS (logcat, tag `Dck`, service_id=289):** `[WirelessCapabilitiesFeatures] wccSysProp: 0` (unknown prop, int 0-3, default 0) + `wccOverride: not set` → `hasWccSupport: false` → `downloadAllowed: false` → full DCK module never downloads ("Initializing as WCC1"). **WCC = CCC capability class: 1=NFC, 2=NFC+BLE, 3=NFC+BLE+UWB.**
-- **Important new fact (ZN):** the `.perapp_props` match is by **process name** (nice_name), not package — `com.google.android.gms` only covers the main process. Chimera DCK runs in **`com.google.android.gms.persistent`** (needs its own lines in config). `.unstable` is INTENTIONALLY LEFT OUT (DroidGuard/PIF Pixel 10; PI 3/3 maintained).
-- **Aurora spoof (14 Ultra: model=24030PN60G/device/name=aurora/marketname)** applied via COW + Build.* (new JNI in module) on: gms, gms.persistent, walletnfcrel (no effect — wallet under umount is not injected), bydautolink (had to **turn off umount in manager UI**). Even with everything spoofed: incompatible → verdict depends on wcc, not model.
-- **Phenotype override applied:** `DckFeatureMain__wcc_override=3` inserted into `/data/data/com.google.android.gms/databases/phenotype.db` (`flag_overrides` id 18 + `flag_overrides_to_commit`, config_package_id **231** = `com.google.android.gms.dck`; db backup in `/data/local/tmp/phenotype.db*`). Decoded format of existing overrides (Android Auto/DiLink ones, ids 1-17): type 1=int, 4=string, account_id=0. **Commit does not trigger with force-stop — likely trigger is boot.** Broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE` exists (--es package/flag/type/value) as an alternative. ⚠️ New GMS **reverts overrides in ≤24h** (signed configs) — may need periodic re-application.
-- **BYD app wiped + spoof active: same verdict** (verdict is neither local cache nor reported model).
-- Research: no public mention of `wccSysProp`/`wccOverride` — prop name only via GMS decompilation (class `WirelessCapabilitiesFeatures`).
-- ⏳ **NEXT:** decide route for `downloadAllowed` (see below — Session 9 part 2).
+**Research conclusions (24/Jul — sources: support.google.com/wallet/answer/12060041, /11358016, /13037118, byd.com/br/chave-digital, byd.com/eu, dolphinbyd.com.br forum threads 4976/2935, Reddit r/BYD 1on9yem/1uhy20t/1usp25c):**
+- **The block is from Google Wallet/Google, server-side, by model+ROM** — NOT region nor integrity. Public list short ("Pixel 6+, S21+, some Android 12+") but real list is server-side and unpublished; toggles without app update.
+- **Depends on Google's "digital key API" embedded in the ROM by the OEM** — Xiaomi included it in HyperOS 3.0.3 model by model. Real risk: xiaomi.eu may lack this API.
+- Hardware: NFC+eSE is enough; **UWB is optional** — BYD is NFC-only.
+- BYD's actual list (BR forum, Apr/2025): Samsung S20→S25, Xiaomi 12→14, OPPO Find X8/Pro. **No Xiaomi 17.**
+- **Samsung Wallet route DISPROVEN:** requires Galaxy hardware + One UI + Knox attestation (unique SAK in TrustZone). KnoxPatch marks Wallet/Pay as ❌.
+- **"Xiaomi 17 works" signal DEBUNKED:** hearsay. Only real success = BMW i4 + Xiaomi 17 base. **Google's official list has "17 & 17 Ultra", NOT 17 Pro or 17 Pro Max** (popsicle = China-only, 2509FPN0BC, no Global variant). DCK lives 100% in Play services; eligibility is server-side by model identity. Server-side flips happen (15T Pro Uruguay ~08/Jul).
 
-**Session 9 part 2 (24/Jul evening — DCK rock bottom):**
-- **`wccSysProp` = `ro.gms.dck.eligible_wcc`** (int 0-3, default 0) — source: `defpackage/bsst.java` (classes6.dex of gms base, jadx on-device). **SET live via `setprop` (works because the prop didn't exist) and persisted in DeviceID+ `.props_spoof` (service.sh boot_completed+5s)** → `wccSysProp: 3` in log, `hasWccSupport` passed. **Even so, BYD app still blocked.**
-- **Remaining gate = `downloadAllowed` = flag `DckStub__full_module_download_allowed`** (bool, default false) — source: `defpackage/jycg.java` (classes15.dex). Module eligibility: `bsog.b()` = `wcc>0 && downloadAllowed`. Stub's other flags: `DckStub__are_flags_synced` (default false!), `DckStub__disable_dck_support`. wcc override = `DckFeatureMain__wcc_override` (long, default -1; jybv.java). gtwx registers package `com.google.android.gms.dck` (config_package_id **231**, params EMPTY — server does not serve DCK for this model).
-- **New phenotype schema (db v1033+) decoded** (classes8: fkch/fkee/fjzr): override merge requires link in `experiment_states_to_overrides` with the package's `committed_experiment_state_id` (dck = 4372). Applied: overrides id 18 (`DckFeatureMain__wcc_override=3` type 1), 19 (`DckStub__full_module_download_allowed=1` type 0), 20 (`DckStub__are_flags_synced=1`) + links to 4372 + `flag_overrides_to_commit`. **NOTHING applies** — the read operation is called `getCommittedOverridesPhixit` ("Phixit" = internal debug tool; likely overrides only work in dogfood/debug flow, and production gtwx reads only served config). Broadcast `com.google.android.gms.phenotype.FLAG_OVERRIDE` returns 0 with no effect. XML `gms_chimera_phenotype_flags.xml` is write-only cache (edits ignored). **The old Android Auto overrides (ids 1-17) have NO link in experiment_states_to_overrides — possibly never applied via phenotype.**
-- phenotype.db backup in `/data/local/tmp/phenotype.db*`. GMS sources decompiled on-device: `/data/local/tmp/gmsout{,8,15}/`; key classes copied to `analysis/byd/*.java` in repo.
-- **Possible routes for downloadAllowed:** (a) **GMS Phixit** (polodarb, root app built for the new schema — calls the official op; revert ≤24h due to signed configs, needs re-apply); (b) call the binder op `SetFlagOverridesOperation` directly; (c) accept there may be an additional server-side gate (model allowlist on module download — `downloadAllowed` may be decided server-side, not just locally).
-
-**Session 9 part 3 (24/Jul ~23:00 — overrides exhausted, empirical verdict):**
-- **GMS Phixit tested** (fork jcrutch-design/GMS-Phixit-Android17 v1.5, sha256 `8b0fc972…`, installed as `ua.polodarb.gmsphixit`): wrote the full DCK flag registry (~90 overrides, ids 21-109, incl. `DckStub__full_module_download_allowed=1` and `DckStub__are_flags_synced=1`) into `flag_overrides` + `flag_overrides_to_commit`. **No effect on production read path.**
-- Manual complements tested, all without effect: links from ALL dck overrides → `experiment_states_to_overrides` in committed state 4372 (92 links); mirror overrides in **account 1** (user) + links in state 3889. `downloadAllowed: false` persisted in all.
-- **Verdict: in production GMS 26.28.60 (262860035), gtwx does NOT apply phenotype overrides through any known local channel** (db, links, Phixit, FLAG_OVERRIDE broadcast, chimera XML). The real gtwx read path (gtvd/gtwx in classes.dex, not yet decompiled) likely reads only the served config — and the server does not serve DCK for this model (empty params).
-- **Possible next steps (not executed):** (1) decompile `classes.dex` (gtvd/gtwx client) to find the real read path (there may be a snapshot cache to invalidate); (2) protobuf surgery on the served `experiment_token`/`params`; (3) accept server-side gate.
-- Good final state: `ro.gms.dck.eligible_wcc=3` ACTIVE + persisted in `.props_spoof` (DeviceID+ service.sh); wcc=3 read on every boot. dck overrides remain in db (inert) — backup in `/data/local/tmp/phenotype.db*`.
-
-**ROLLBACK (24/Jul ~23:30, at user request — front closed):** `.perapp_props` restored (Petal only); `ro.gms.dck.eligible_wcc` removed from `.props_spoof` and deleted live; ALL dck overrides/links deleted from phenotype.db (0 remaining, backup deleted); `gms_chimera_phenotype_flags.xml` restored from backup; **GMS Phixit uninstalled**; `/data/local/tmp` cleaned of session artifacts; gms restarted and verified WITHOUT injection/spoof; `analysis/byd/` in repo pruned (only the analysis `.java` files kept: bsst/bsog/jy*/fj*/fk*/gtwx). **Manual pending: re-enable "Umount modules" for BYD app in KSU manager** (was turned off for injection). DeviceID+ `.so` with Build.* spoof (v2.2.0-dev) REMAINS (valid, harmless feature). Bump v2.2.0 + native commit still pending.
-- BYD app check architecture: `DigitalKeyHelper.t()` → `isCreateDigitalKeyPossible()` (GMS); error displayed in WebView (`catalogPage`). App sends `deviceManufacturer` (0002=xiaomi) to BYD server. Samsung check: `com.samsung.android.dkey` + content provider (not applicable). "China devices should not use Google DCK" check (bmms) PASSES (does not appear in log).
+**Session 9 — BYD app RE + DCK gating (24/Jul):**
+- BYD app RE: check calls `DigitalKeyFramework.getClient(ctx).isCreateDigitalKeyPossible()` — verdict from GMS DCK, not local list. `deviceManufacturer` = 0002=xiaomi.
+- DCK gating in GMS: `wccSysProp` → `hasWccSupport` → `downloadAllowed` → full module download. WCC = CCC capability class (1=NFC, 2=+BLE, 3=+UWB).
+- `wccSysProp` = `ro.gms.dck.eligible_wcc` (int 0-3). Set=3 live + persisted. But `downloadAllowed` = `DckStub__full_module_download_allowed` — unbeatable: production GMS 26.28.60 does NOT apply phenotype overrides (db, Phixit, FLAG_OVERRIDE broadcast, chimera XML — all tested). gtwx reads only served config; server does not serve DCK for popsicle (empty params). **Full rollback performed 24/Jul ~23:30.**
 
 ### 2.2 Petal Maps (✅ RESOLVED 24/Jul ~18:20 — COW prop_area field-validated)
 **Goal:** run Petal Maps ≥4.7.0.316 — since that version the app requires a Huawei device. Installed: **4.7.0.319** (sideload APKCombo, sha256 `fc1ebc0f…d3ad3`). HMS Core (`com.huawei.hwid`) and AppGallery were already on the device.
@@ -350,6 +357,17 @@
 5. **Upstream PR:** https://github.com/MorpheApp/morphe-patches/pull/2239 — extends "Bypass certificate checks" with `IsGoogleSignedFingerprint` + `returnEarly(false)`. andersonlucasg3 fork, branch `fix/ytmusic-aa-dynamite-crash`.
 6. **Lessons:** patcher OOM → reboot device before patching large APKs; manager keystore reusable (empty storepass!); apktool corrupts resources → prefer dex-only; Frida 17 without java-bridge → bundle with esbuild; always check device serial (Redmi `f10c4f767d7b` confused with popsicle); frida-server is a detection vector → stop after use.
 
+### Session 13 (28/Jul ~21:10 → 29/Jul ~01:00 — BYD digital key front REOPENED; DeviceID+ v2.3.1)
+1. **Frida client-side (BYD app):** `isDckFeatureAvailable()→true` hooked; `isCreateDigitalKeyPossible()` binder proxy → `FrameworkUnavailableException` (no DCK service). App dies ~3–5s after attach — **DexProtector** refuses to decrypt code under ptrace.
+2. **Frida GMS-side:** 7 hooks on `bsog`/`bsst`/`jycg`/`jycd` in `com.google.android.gms` (Chimera DelegateLastClassLoader). `ro.gms.dck.eligible_wcc=3` set → eligibility passes. **But download doesn't fire:** `bsog.b()` AOT-inlined, `ModuleInstallService` reads `gtwx`/`gtvd` independently. **GMS selfchecker** detects Frida → SIGSEGV crash loop → device reboot ~00:07. Play Protect flags "risky app". **Frida-on-GMS ABANDONED.**
+3. **Web research (3 agents):** zero public DCK bypass cases. DCK module APK unfindable (optional module, not in factory images/APKMirror). BYD root detection since v2.9.1 (Shamiko+HMA recommended; Shamiko dead on ZN 1.4.3 → HMA-OSS is the alternative).
+4. **BYD forensics — MMKV cache DISCOVERED:** `/data/data/com.byd.bydautolink/files/mmkv/NFC_CACHE_FILE<VIN>` — unencrypted MMKV with `isWCC3`/`isHaveLocalKey`/`isShowEnter`. Deleted → app re-evaluates. **Verdict is LOCAL (GMS DCK stub), not BYD backend.** Full flow mapped: app → BYD backend → Wallet → CCC R3 + RKP → NFC.
+5. **DeviceID+ v2.3.0:** aggressive hook (`kAccNative` + `Tasks.forResult(TRUE)`) → crashed flow (SIGSEGV `ExecuteNterpImpl+324`). Root cause: forced DCK class load destabilized DexProtector.
+6. **DeviceID+ v2.3.1 (current):** passive `FindClass("zzfa")` with `ExceptionClear` in 250ms poll after 1.5s grace delay. Only hook: `isCreateDigitalKeyPossible→true`. `.so` 17880 bytes. Controlled by `dck.hook=1`.
+7. **Deployed + armed, validation PENDING:** umount OFF for BYD, `dck.hook=1` set. (`ro.gms.dck.eligible_wcc` is NOT persisted — settable live via `setprop`, resets on reboot; irrelevant now that the GMS-Frida front was abandoned.) Remaining: force-stop BYD → crash check → delete MMKV → "Add digital key" → verify `intercepted` log + `isWCC3`. MMKV backup in `backup/byd-mmkv-2026-07-28/`.
+8. **Incidents:** bootloop during GMS Frida crash (device recovered); Play Protect flag (monitor PI). KSU umount reverted by bootloop → user turned OFF again. New rule: verify umount after any boot incident.
+9. **Artifacts:** `native/dck_hook.{cpp,h}`, modified `deviceid_zygisk.cpp`/`build.sh`/`module.prop`; `tools/frida-agent/` (byd-dck-hook.js, gms-dck-unlock.js, byd-antitamper.js, Python runners); `analysis/byd/gms_dck_run.log`; `tools/venv-frida16/` (Frida 16 stealth attempt — do not commit if large).
+
 ### Session 10 (25/Jul morning — Revolut: full forensics + `.ko` with hide, not resolved)
 1. **Diagnosis:** visible vectors confirmed as app uid: `/proc/modules` ksu, `/sys/module/ksu`, `/system/bin/su`. prctl harmless (fact 30). SuSFS ruled out (fact 31).
 2. **Tests that failed:** adb root OFF (no su), frida-server removed, manager frozen, new SSAID + clear data, per-app injection with Pixel 10 spoof (detected by maps scan — fact 32).
@@ -374,3 +392,6 @@
 - **Morphe Manager keystore:** `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2), storepass **empty**, alias `Morphe`, keypass `Morphe` — reusable for CLI builds with `install -r`
 - **apktool corrupts resources:** rebuilds via apktool break `resources.arsc` (`Resources$NotFoundException` crash). Prefer **dex-only surgery** (baksmali/smali + ReplaceDex.java) for targeted patches
 - **Frida 17:** java-bridge was removed from core → scripts need to be **bundled with esbuild** (`frida-java-bridge`). `enumerate_processes()` may not list certain apps → use `pidof` via adb + attach by PID. **Always stop frida-server after use** (detection vector for banking apps)
+- **Frida + GMS = dangerous:** GMS has an internal anti-Frida selfchecker that causes SIGSEGV crash loops and can reboot the device. Never attach Frida to `com.google.android.gms`.
+- **DexProtector/Licel apps (BYD, Revolut, Bradseguros):** refuse to run under ptrace/Frida — SIGSEGV within seconds. Zygisk is the only viable hook route for these apps.
+- **KSU umount per app reverts on bootloop/recovery:** verify "Umount modules" toggle in KSU manager after any boot incident. Flag lives at offset `f272` in `/data/adb/ksu/.allowlist` (stride 784).
