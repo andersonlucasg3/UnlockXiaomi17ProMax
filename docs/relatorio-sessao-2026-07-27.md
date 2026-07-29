@@ -1,106 +1,106 @@
-# Relatório da Sessão — 2026-07-27
+# Session Report — 2026-07-27
 
-**Objetivo:** Fazer o YT Music Morphe funcionar no Android Auto (MediaBrowserService) no Xiaomi 17 Pro Max com microG + Google Play Services reais.
+**Objective:** Get YT Music Morphe working on Android Auto (MediaBrowserService) on the Xiaomi 17 Pro Max with microG + real Google Play Services.
 
-**Aparelho:** Xiaomi 17 Pro Max (popsicle) | xiaomi.eu OS3.0.317.0.WPBCNXM | Android 16 | KSU LKM 32558
+**Device:** Xiaomi 17 Pro Max (popsicle) | xiaomi.eu OS3.0.317.0.WPBCNXM | Android 16 | KSU LKM 32558
 
 ---
 
-## ✅ STATUS ATUAL
+## ✅ CURRENT STATUS
 
-**YT Music Morphe 9.15.51 funcionando no Android Auto ✅** — podcasts carregam, música exige YouTube Premium (server-side, ver §Veredito premium/podcasts). Sem crash, sem spinner infinito. Stack:
+**YT Music Morphe 9.15.51 working on Android Auto ✅** — podcasts load, music requires YouTube Premium (server-side, see §Verdict premium/podcasts). No crash, no infinite spinner. Stack:
 
-| Componente | Detalhe |
+| Component | Detail |
 |---|---|
 | APK | YT Music 9.15.51 stock (APKMirror) |
-| Patches (37) | seleção do usuário via CLI Morphe (bundle v1.37.0) |
-| Fix adicional | `tcn.c(String) → return false` (cirurgia dex-only via baksmali/smali) |
-| Assinatura | manager.keystore (BKS v2, storepass "", alias "Morphe", keypass "Morphe") |
-| PR upstream | https://github.com/MorpheApp/morphe-patches/pull/2239 |
+| Patches (37) | user selection via Morphe CLI (bundle v1.37.0) |
+| Additional fix | `tcn.c(String) → return false` (dex-only surgery via baksmali/smali) |
+| Signature | manager.keystore (BKS v2, storepass "", alias "Morphe", keypass "Morphe") |
+| Upstream PR | https://github.com/MorpheApp/morphe-patches/pull/2239 |
 
 ---
 
-## 1. Diagnóstico — cadeia do crash
+## 1. Diagnosis — crash chain
 
-### 1.1 Sintoma inicial
+### 1.1 Initial symptom
 
-YT Music Morphe **crashava** quando o Android Auto conectava ao `MediaBrowserService`:
+YT Music Morphe **crashed** when Android Auto connected to `MediaBrowserService`:
 
 ```
 java.lang.IllegalStateException: Missing DynamiteApplicationContext.
     at com.google.android.gms.common.GoogleCertificatesImpl.<init>(...)
     at java.lang.Class.newInstance(Native Method)
     at tqd.c(PG:11)          ← DynamiteModule: Class.forName().newInstance()
-    at tbz.c(PG:30)          ← GoogleCertificates: carrega GoogleCertificatesImpl
-    at tcn.a(PG:32)          ← GoogleSignatureVerifier: verificação de assinatura
+    at tbz.c(PG:30)          ← GoogleCertificates: loads GoogleCertificatesImpl
+    at tcn.a(PG:32)          ← GoogleSignatureVerifier: signature verification
     at tcn.c(PG:1)
-    at kxo.g(PG:85)          ← AllowlistManager: "esse caller é Google-signed?"
+    at kxo.g(PG:85)          ← AllowlistManager: "is this caller Google-signed?"
     at MusicBrowserService.f(PG:242)  ← onGetRoot
     at bzl.onGetRoot(PG:116)
 ```
 
-### 1.2 Classes envolvidas (9.15.51, ofuscação ProGuard)
+### 1.2 Classes involved (9.15.51, ProGuard obfuscation)
 
-| Sigla | Classe | Função |
-|-------|--------|--------|
-| `kxo` | AllowlistManager | Decide se o caller (ex: gearhead) pode browsear. Método `g(avgi, aves)` = gate principal, `h(aves)` = gate de browsability, `m(avgi)` = fingerprint SHA-256 |
-| `tcn` | GoogleSignatureVerifier | Verifica se um pacote é assinado pelo Google. `c(String)` = entry point, chama `a(String)` → `tbz` |
-| `tbz` | GoogleCertificates | Carrega `GoogleCertificatesImpl` via Dynamite (GMS). Método `c()` faz `tqd.d("googlecertificates").c("GoogleCertificatesImpl")` |
-| `tqd` | DynamiteModule | Carrega classes do GMS via reflexão. `c(String)` = `classLoader.loadClass(str).newInstance()` |
+| Abbrev | Class | Function |
+|--------|-------|----------|
+| `kxo` | AllowlistManager | Decides whether the caller (e.g. gearhead) can browse. Method `g(avgi, aves)` = main gate, `h(aves)` = browsability gate, `m(avgi)` = SHA-256 fingerprint |
+| `tcn` | GoogleSignatureVerifier | Verifies whether a package is Google-signed. `c(String)` = entry point, calls `a(String)` → `tbz` |
+| `tbz` | GoogleCertificates | Loads `GoogleCertificatesImpl` via Dynamite (GMS). Method `c()` does `tqd.d("googlecertificates").c("GoogleCertificatesImpl")` |
+| `tqd` | DynamiteModule | Loads GMS classes via reflection. `c(String)` = `classLoader.loadClass(str).newInstance()` |
 
-### 1.3 Por que crasha
+### 1.3 Why it crashes
 
-O `GoogleCertificatesImpl` do GMS **real** (instalado no device, não o microG) exige `DynamiteApplicationContext` no construtor. Esse contexto nunca é inicializado porque o app usa **microG** (redirecionamento do GmsCore support patch). A exceção `IllegalStateException` não é capturada (o código só captura `tpz`/`RemoteException`), então o processo morre.
+The **real** GMS `GoogleCertificatesImpl` (installed on the device, not microG) requires `DynamiteApplicationContext` in its constructor. This context is never initialized because the app uses **microG** (GmsCore support patch redirection). The `IllegalStateException` is not caught (the code only catches `tpz`/`RemoteException`), so the process dies.
 
-**Em devices sem GMS real** (só microG), o `tbz.c()` falha gracefulmente com `tpz` → retorna "não-assinado" → `kxo.g()` avalia o resto da condição (incluindo `m()`) → funciona. Por isso o patch oficial do Morphe (`return true` em `kxo.m`) basta para a maioria.
+**On devices without real GMS** (microG only), `tbz.c()` fails gracefully with `tpz` → returns "not signed" → `kxo.g()` evaluates the rest of the condition (including `m()`) → works. That's why the official Morphe patch (`return true` in `kxo.m`) is enough for most.
 
-### 1.4 Três builds sem o patch — por quê
+### 1.4 Three builds without the patch — why
 
-| Build | Data | Bundle | Motivo |
+| Build | Date | Bundle | Reason |
 |-------|------|--------|--------|
-| 9.15.51 (23/jul) | 23/jul | pb-897837162 ("Rushi's Patches") | Bundle antigo **não continha** o patch BypassCertificateChecks |
-| 9.28.51 experimental | 26/jul | pb-0.jar (v1.37.0) | Bundle novo **tinha** o patch, mas a seleção salva do manager (da sessão com bundle antigo) **não o incluía** — ficou desmarcado na UI |
-| 9.15.51 re-patch | 27/jul 09:43 | pb-0.jar | Processo `app.morphe.manager:Patcher` sofreu **SIGABRT por OOM** (mmap de 1,28 GB falhou no start da VM) ~1 min antes da instalação → APK saiu sem o patch |
+| 9.15.51 (23/Jul) | 23/Jul | pb-897837162 ("Rushi's Patches") | Old bundle **did not contain** the BypassCertificateChecks patch |
+| 9.28.51 experimental | 26/Jul | pb-0.jar (v1.37.0) | New bundle **had** the patch, but the manager's saved selection (from the session with the old bundle) **did not include it** — was left unchecked in the UI |
+| 9.15.51 re-patch | 27/Jul 09:43 | pb-0.jar | Process `app.morphe.manager:Patcher` suffered **SIGABRT due to OOM** (1.28 GB mmap failed at VM startup) ~1 min before installation → APK came out without the patch |
 
 ---
 
-## 2. Fix validado
+## 2. Validated fix
 
 ### 2.1 Patch via Morphe CLI
 
-O Morphe Manager não conseguiu aplicar o patch (OOM). Usamos o **Morphe CLI** (morphe-desktop-1.12.0-all.jar) no PC com o bundle `pb-0.jar` extraído do próprio manager:
+Morphe Manager could not apply the patch (OOM). We used **Morphe CLI** (morphe-desktop-1.12.0-all.jar) on the PC with the `pb-0.jar` bundle extracted from the manager itself:
 
 ```
 java -jar morphe-cli.jar patch --patches pb-0.jar -e "Bypass certificate checks" -o output.apk stock.apk
 ```
 
-**Problema:** A CLI assina com keystore pública "Morphe" → `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (assinatura diferente do APK instalado).
+**Problem:** The CLI signs with the public "Morphe" keystore → `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (different signature from the installed APK).
 
-**Solução:** Extrair o keystore do manager do device:
-- `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2, alias "Morphe", store password **vazia**, key password "Morphe")
-- Assinar com `SignApk.java` (apksig + BouncyCastle do próprio jar do CLI) → `install -r` preserva dados
+**Solution:** Extract the manager's keystore from the device:
+- `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2, alias "Morphe", store password **empty**, key password "Morphe")
+- Sign with `SignApk.java` (apksig + BouncyCastle from the CLI jar itself) → `install -r` preserves data
 
-### 2.2 O patch oficial não basta com GMS real
+### 2.2 The official patch is not enough with real GMS
 
-Após aplicar o patch Morphe (`return true` em `kxo.m`), o crash **continuou**. Frida provou em runtime:
+After applying the Morphe patch (`return true` in `kxo.m`), the crash **persisted**. Frida proved at runtime:
 
-- `kxo.h()` retornava `false` para gearhead (allowlist `t`)
-- O crash Dynamite acontecia **dentro de `tcn.c()`** (= `this.r.c()` em `kxo.g`), **ANTES** de `m()` ser avaliado
+- `kxo.h()` returned `false` for gearhead (allowlist `t`)
+- The Dynamite crash happened **inside `tcn.c()`** (= `this.r.c()` in `kxo.g`), **BEFORE** `m()` was evaluated
 
-Ou seja: o patch neutraliza o terceiro termo da condição (`!m()`), mas `!this.r.c()` é avaliado **antes** e **crasha** antes de chegar em `m()`.
+That is: the patch neutralizes the third term of the condition (`!m()`), but `!this.r.c()` is evaluated **first** and **crashes** before reaching `m()`.
 
-### 2.3 Fix #1 (amplo, validado): `kxo.g` e `kxo.h` → `return true`
+### 2.3 Fix #1 (broad, validated): `kxo.g` and `kxo.h` → `return true`
 
-Edição via apktool: `g()` e `h()` retornam `true` imediatamente. AA funcionou.
+Edit via apktool: `g()` and `h()` return `true` immediately. AA worked.
 
-**Problema:** rebuilds via apktool **corrompem resources** — o app crashava na UI do celular com `Resources$NotFoundException res/d9P.xml`. O apktool reempacota resources e quebra referências.
+**Problem:** apktool rebuilds **corrupt resources** — the app crashed on the phone UI with `Resources$NotFoundException res/d9P.xml`. apktool repacks resources and breaks references.
 
-### 2.4 Fix #2 (mínimo, escolhido pro upstream): `tcn.c(String) → return false`
+### 2.4 Fix #2 (minimal, chosen for upstream): `tcn.c(String) → return false`
 
-**Método:** cirurgia **dex-only** (baksmali/smali 3.0.9 fat jars):
+**Method:** **dex-only** surgery (baksmali/smali 3.0.9 fat jars):
 
 ```smali
-# tcn.smali — antes:
+# tcn.smali — before:
 .method public final c(Ljava/lang/String;)Z
     .registers 2
     invoke-virtual {p0, p1}, Ltcn;->a(Ljava/lang/String;)Ltch;
@@ -109,7 +109,7 @@ Edição via apktool: `g()` e `h()` retornam `true` imediatamente. AA funcionou.
     return p0
 .end method
 
-# depois:
+# after:
 .method public final c(Ljava/lang/String;)Z
     .registers 2
     const/4 v0, 0x0
@@ -117,125 +117,125 @@ Edição via apktool: `g()` e `h()` retornam `true` imediatamente. AA funcionou.
 .end method
 ```
 
-**Efeito:** `tcn.c()` reporta "não-assinado pelo Google" **sem tocar no Dynamite**. Em `kxo.g()`:
+**Effect:** `tcn.c()` reports "not Google-signed" **without touching Dynamite**. In `kxo.g()`:
 
 ```java
 !this.r.c(pkg) && !m(caller)
-→ !false && !true        // c() = false, m() = true (patch Morphe)
+→ !false && !true        // c() = false, m() = true (Morphe patch)
 → true && false
-→ false                   // condição falha → return true (autorizado)
+→ false                   // condition fails → return true (authorized)
 ```
 
-**Vantagens sobre o Fix #1:**
-- Mantém `kxo.g/h` originais (allowlists intactas — só o Dynamite é bypassado)
-- Não corrompe resources (dex-only, sem tocar em resources.arsc/AndroidManifest)
-- Comportamento idêntico em devices com/sem GMS real
+**Advantages over Fix #1:**
+- Keeps original `kxo.g/h` (allowlists intact — only Dynamite is bypassed)
+- Does not corrupt resources (dex-only, without touching resources.arsc/AndroidManifest)
+- Identical behavior on devices with/without real GMS
 
-### 2.5 Build final
+### 2.5 Final build
 
 ```
-CLI Morphe (--exclusive, 37 patches) → APK base
-  → baksmali classes.dex → editar tcn.smali → smali → classes-patched.dex
-  → ReplaceDex.java (preserva compressão DEFLATED, STORED p/ .so)
+Morphe CLI (--exclusive, 37 patches) → base APK
+  → baksmali classes.dex → edit tcn.smali → smali → classes-patched.dex
+  → ReplaceDex.java (preserves DEFLATED compression, STORED for .so)
   → SignApk.java (manager.keystore)
   → adb install -r
 ```
 
-**APK final:** `analysis/ytmusic-morphe/cli/ytmusic-9.15.51-final-signed.apk`
+**Final APK:** `analysis/ytmusic-morphe/cli/ytmusic-9.15.51-final-signed.apk`
 
 ---
 
-## 3. Veredito "só podcasts no AA"
+## 3. Verdict "podcasts only on AA"
 
-Com todos os gates client-side abertos (tcn.c, kxo.m, kxo.g, kxo.h), o Android Auto mostra **só podcasts** + upsell "faça upgrade para o YouTube Premium".
+With all client-side gates open (tcn.c, kxo.m, kxo.g, kxo.h), Android Auto shows **only podcasts** + "upgrade to YouTube Premium" upsell.
 
-**Análise do código:**
+**Code analysis:**
 
-- **`khr.e()`** (entitlement/unlimited check) **já é patcheado pra `true`** pelo Morphe — usado em `lbg.java:439` como gate de playback
-- **`skip_entitlement_check`** é setado pra `true` para gearhead em `lai.b()`
-- A árvore de browse (`lgp.v()`) é construída a partir de **protobufs `buol` retornados pelo servidor** (Innertube API)
-- **Não existe filtro client-side** separando música de podcast — o servidor simplesmente retorna conteúdo diferente para Android Auto (free-tier = só podcasts)
+- **`khr.e()`** (entitlement/unlimited check) **is already patched to `true`** by Morphe — used in `lbg.java:439` as playback gate
+- **`skip_entitlement_check`** is set to `true` for gearhead in `lai.b()`
+- The browse tree (`lgp.v()`) is built from **`buol` protobufs returned by the server** (Innertube API)
+- **There is no client-side filter** separating music from podcast — the server simply returns different content for Android Auto (free-tier = only podcasts)
 
-**Conclusão: SERVER-SIDE.** Documentado em ReVanced#6185. Nenhum patch local pode adicionar conteúdo que o servidor não envia. Contas YouTube Premium recebem o catálogo completo também no AA.
+**Conclusion: SERVER-SIDE.** Documented at ReVanced#6185. No local patch can add content the server does not send. YouTube Premium accounts get the full catalog on AA too.
 
 ---
 
-## 4. PR upstream
+## 4. Upstream PR
 
 **https://github.com/MorpheApp/morphe-patches/pull/2239**
 
-Estende o patch "Bypass certificate checks" com:
+Extends the "Bypass certificate checks" patch with:
 
-- **`GoogleCertificatesRemoteFingerprint`**: ancora na string `"Failed to get Google certificates from remote"` (método `tcn.a`)
-- **`IsGoogleSignedFingerprint`**: `(String)→boolean` com `classFingerprint = GoogleCertificatesRemoteFingerprint` — isola `tcn.c`
-- **`returnEarly(false)`** em `IsGoogleSignedFingerprint.method` no `execute {}` do patch
+- **`GoogleCertificatesRemoteFingerprint`**: anchors on the string `"Failed to get Google certificates from remote"` (method `tcn.a`)
+- **`IsGoogleSignedFingerprint`**: `(String)→boolean` with `classFingerprint = GoogleCertificatesRemoteFingerprint` — isolates `tcn.c`
+- **`returnEarly(false)`** in `IsGoogleSignedFingerprint.method` in the patch's `execute {}`
 
 Fork: `andersonlucasg3/morphe-patches`, branch `fix/ytmusic-aa-dynamite-crash`.
 
-Build local não compilou (plugin `app.morphe.patches:1.3.3` requer GitHub Packages auth — CI do Morphe tem as credenciais).
+Local build did not compile (plugin `app.morphe.patches:1.3.3` requires GitHub Packages auth — Morphe CI has the credentials).
 
 ---
 
-## 5. Lições operacionais
+## 5. Operational lessons
 
-### Patcher OOM → reiniciar antes de patchear
-O processo `app.morphe.manager:Patcher` alocou 1,28 GB de mmap e morreu por OOM no start da VM. O YT Music tem ~80 MB; o patcher precisa de RAM proporcional. **Sempre reiniciar o device (limpa RAM) antes de patchear APKs grandes no manager.**
+### Patcher OOM → reboot before patching
+The `app.morphe.manager:Patcher` process allocated 1.28 GB of mmap and died from OOM at VM startup. YT Music is ~80 MB; the patcher needs proportional RAM. **Always reboot the device (clears RAM) before patching large APKs in the manager.**
 
-### Keystore do manager reutilizável
-Credenciais: `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2), storepass **vazia**, alias `Morphe`, keypass `Morphe`. Permite assinar builds do CLI com a mesma identidade do manager → `install -r` sem desinstalar.
+### Reusable manager keystore
+Credentials: `/data/data/app.morphe.manager/app_signing/morphe.keystore` (BKS v2), storepass **empty**, alias `Morphe`, keypass `Morphe`. Allows signing CLI builds with the same identity as the manager → `install -r` without uninstalling.
 
 ### Dex-only > apktool
-apktool corrompeu resources em 100% dos rebuilds testados (3 tentativas). A cirurgia dex-only (baksmali/smali + ReplaceDex.java) é **confiável** e não toca em resources.arsc, AndroidManifest.xml, ou libs nativas. **Sempre preferir dex-only para patches pontuais.**
+apktool corrupted resources in 100% of tested rebuilds (3 attempts). Dex-only surgery (baksmali/smali + ReplaceDex.java) is **reliable** and does not touch resources.arsc, AndroidManifest.xml, or native libs. **Always prefer dex-only for targeted patches.**
 
-### Sempre conferir serial do device
-O device `f10c4f767d7b` (Redmi) apareceu no adb durante a sessão. Um `install` foi disparado nele por engano → `INSTALL_FAILED_USER_RESTRICTED`. **Sempre verificar `adb devices` e usar `-s <serial>` explícito.** O serial do popsicle pode mudar entre conexões (era `4d7fc9af`, virou `f10c4f767d7b` em uma das reconexões).
+### Always check device serial
+Device `f10c4f767d7b` (Redmi) showed up on adb during the session. An `install` was accidentally fired at it → `INSTALL_FAILED_USER_RESTRICTED`. **Always verify `adb devices` and use explicit `-s <serial>`.** The popsicle serial can change between connections (was `4d7fc9af`, became `f10c4f767d7b` on one of the reconnections).
 
-### Frida 17 sem java-bridge + quirks do device
-- Frida 17 removeu a java-bridge do core → scripts precisam ser bundlados (esbuild com `frida-java-bridge` do `tools/frida-agent`)
-- `enumerate_processes()` **não lista** o YT Music neste device (razão desconhecida; `ps -A` lista) → usar `pidof` via adb + attach por PID
-- Processo do YT Music morre quando o gearhead é force-stopped → `Java.perform` nunca dispara em spawn-gating
-- **Solução:** runner Python com **re-attach loop** (`analysis/ytmusic-morphe/frida/run.py` + `tools/frida-agent/mbs-hook.ts`)
+### Frida 17 without java-bridge + device quirks
+- Frida 17 removed java-bridge from core → scripts need to be bundled (esbuild with `frida-java-bridge` from `tools/frida-agent`)
+- `enumerate_processes()` **does not list** YT Music on this device (unknown reason; `ps -A` lists it) → use `pidof` via adb + attach by PID
+- YT Music process dies when gearhead is force-stopped → `Java.perform` never fires in spawn-gating
+- **Solution:** Python runner with **re-attach loop** (`analysis/ytmusic-morphe/frida/run.py` + `tools/frida-agent/mbs-hook.ts`)
 
-### Frida-server no device é vetor de detecção
-O frida-server 17.9.3 foi deixado rodando no device após a investigação. **Sempre parar após usar** (apps bancários detectam o processo `frida-server`). O binário permanece em `analysis/ytmusic-morphe/frida-server` (fora do git).
-
----
-
-## 6. Linha do tempo (síntese do dia)
-
-1. **Manhã:** Diagnóstico do crash original (9.15.51 de 23/jul). Descoberta: patch BypassCertificateChecks ausente no bundle antigo. Análise de 3 builds sem patch.
-2. **Tarde:** Patch via CLI → problema de assinatura → extração do keystore do manager → `install -r` OK. Crash persistente (Dynamite).
-3. **Frida:** prova em runtime que `tcn.c` crasha antes de `m()`. Fix #1 (g/h → true) via apktool → AA funciona, mas apktool corrompe resources.
-4. **Fix #2:** tcn.c → false via dex-only → AA funciona, celular OK, resources íntegros.
-5. **Veredito podcasts:** análise do código confirma que o corte é server-side (Innertube API).
-6. **PR upstream:** #2239 no MorpheApp/morphe-patches com o fix mínimo.
-7. **Build final:** CLI --exclusive 37 patches + fix dex-only → APK assinado e validado.
-8. **Limpeza:** frida-server parado no device.
+### Frida-server on device is a detection vector
+frida-server 17.9.3 was left running on the device after investigation. **Always stop after use** (banking apps detect the `frida-server` process). The binary remains at `analysis/ytmusic-morphe/frida-server` (outside git).
 
 ---
 
-## 7. Artefatos da sessão
+## 6. Timeline (day summary)
+
+1. **Morning:** Diagnosis of original crash (9.15.51 from 23/Jul). Discovery: BypassCertificateChecks patch missing from old bundle. Analysis of 3 builds without patch.
+2. **Afternoon:** CLI patch → signature issue → manager keystore extraction → `install -r` OK. Persistent crash (Dynamite).
+3. **Frida:** runtime proof that `tcn.c` crashes before `m()`. Fix #1 (g/h → true) via apktool → AA works, but apktool corrupts resources.
+4. **Fix #2:** tcn.c → false via dex-only → AA works, phone OK, resources intact.
+5. **Podcast verdict:** code analysis confirms the cutoff is server-side (Innertube API).
+6. **Upstream PR:** #2239 on MorpheApp/morphe-patches with the minimal fix.
+7. **Final build:** CLI --exclusive 37 patches + dex-only fix → APK signed and validated.
+8. **Cleanup:** frida-server stopped on device.
+
+---
+
+## 7. Session artifacts
 
 ```
 analysis/ytmusic-morphe/
-├── REPORT.md                          # Análise inicial (9.15.51 sem patch)
-├── exp/REPORT.md                      # Análise 9.28.51 + investigação do bundle
-├── morphe-patches.json                # Config dos patches (extraído do manager)
-├── pb-0.jar                           # Bundle v1.37.0 (contém BypassCertificateChecks)
-├── pb-897837162.jar                   # Bundle antigo (sem o patch)
-├── patch-src/                         # Decompilação do pb-0.jar
+├── REPORT.md                          # Initial analysis (9.15.51 without patch)
+├── exp/REPORT.md                      # 9.28.51 analysis + bundle investigation
+├── morphe-patches.json                # Patch config (extracted from manager)
+├── pb-0.jar                           # Bundle v1.37.0 (contains BypassCertificateChecks)
+├── pb-897837162.jar                   # Old bundle (without the patch)
+├── patch-src/                         # Decompilation of pb-0.jar
 ├── cli/
 │   ├── morphe-cli.jar                 # morphe-desktop-1.12.0-all.jar
 │   ├── apktool.jar                    # apktool 3.0.3
 │   ├── baksmali.jar / smali.jar       # v3.0.9 fat jars
-│   ├── SignApk.java                   # Assinador com manager.keystore
-│   ├── manager.keystore               # ⚠️ SENSÍVEL — chave de assinatura
+│   ├── SignApk.java                   # Signer with manager.keystore
+│   ├── manager.keystore               # ⚠️ SENSITIVE — signing key
 │   ├── stock.apk                      # YT Music 9.15.51 original
-│   ├── ytmusic-9.15.51-morphe-signed.apk   # Build CLI inicial
-│   ├── ytmusic-9.15.51-final-signed.apk    # Build final (37 patches + tcn fix)
-│   └── final-build.log                # Log completo do CLI
-├── frida-server                       # v17.9.3 (fora do git)
+│   ├── ytmusic-9.15.51-morphe-signed.apk   # Initial CLI build
+│   ├── ytmusic-9.15.51-final-signed.apk    # Final build (37 patches + tcn fix)
+│   └── final-build.log                # Full CLI log
+├── frida-server                       # v17.9.3 (outside git)
 └── frida/
-    ├── run.py                         # Runner com re-attach loop
-    └── hook.js                        # Script Frida (mbs-hook.ts bundlado)
+    ├── run.py                         # Runner with re-attach loop
+    └── hook.js                        # Frida script (bundled mbs-hook.ts)
 ```

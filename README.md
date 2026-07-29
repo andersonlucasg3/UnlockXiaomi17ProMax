@@ -1,37 +1,37 @@
 # UnlockXiaomi — Xiaomi 17 Pro Max (popsicle)
 
-Projeto de desbloqueio, ROM xiaomi.eu e root (KernelSU LKM) do **Xiaomi 17 Pro Max** (codinome `popsicle`, Snapdragon 8 Elite Gen 5, HyperOS 3 / Android 16).
+Unlocking, xiaomi.eu ROM and root (KernelSU LKM) project for the **Xiaomi 17 Pro Max** (codename `popsicle`, Snapdragon 8 Elite Gen 5, HyperOS 3 / Android 16).
 
-## Estado atual (27/jul/2026)
+## Current status (27/Jul/2026)
 
-- **ROM:** xiaomi.eu **OS3.0.317.0.WPBCNXM** (pt-BR + GMS), bootloader desbloqueado
-- **Root:** KernelSU **LKM** (driver backslashxx 32558) no `init_boot` — kernel **stock intacto**
-- **Stack:** ZygiskNext 1.4.3 (enforce) + PlayIntegrityFork v17 + TrickyStore v1.4.1 (keybox DroidWin) + umount global (exceto gms/vending/Termux)
-- **Resultado:** Play Integrity 3/3, Google Wallet ✅, BYD ✅, Caixa ✅, **Petal Maps 4.7.0.319 ✅** (spoof prop_area COW), Revolut ✅ (HMA-OSS), Bradesco Seguros ✅ (HMA-OSS), **YT Music Morphe ✅ Android Auto (podcasts; música exige Premium server-side)** — ver `docs/SESSION-HANDOVER.md`
-- **Módulo próprio:** DeviceID+ v2.1.1 instalada (`modules/deviceidchanger/`, fork AGPL de sidex15) — SSAID por app, spoof de props global e por app (COW prop_area + GOT hooks + **`android.os.Build.*` via JNI**, v2.2.0-dev validado), editor TrickyStore
-- **BYD digital key:** encerrada (24/jul) — gate `downloadAllowed` do GMS DCK sem workaround conhecido; mapa completo do mecanismo no handover (Parte 2.1) e `analysis/byd/`
+- **ROM:** xiaomi.eu **OS3.0.317.0.WPBCNXM** (pt-BR + GMS), bootloader unlocked
+- **Root:** KernelSU **LKM** (driver backslashxx 32558) on `init_boot` — kernel **stock, untouched**
+- **Stack:** ZygiskNext 1.4.3 (enforce) + PlayIntegrityFork v17 + TrickyStore v1.4.1 (keybox DroidWin) + umount global (except gms/vending/Termux)
+- **Result:** Play Integrity 3/3, Google Wallet ✅, BYD ✅, Caixa ✅, **Petal Maps 4.7.0.319 ✅** (spoof prop_area COW), Revolut ✅ (HMA-OSS), Bradesco Seguros ✅ (HMA-OSS), **YT Music Morphe ✅ Android Auto (podcasts; music requires Premium server-side)** — see `docs/SESSION-HANDOVER.md`
+- **Custom module:** DeviceID+ v2.1.1 installed (`modules/deviceidchanger/`, AGPL fork of sidex15) — per-app SSAID, global and per-app prop spoofing (COW prop_area + GOT hooks + **`android.os.Build.*` via JNI**, v2.2.0-dev validated), TrickyStore editor
+- **BYD digital key:** terminated (24/Jul) — GMS DCK `downloadAllowed` gate with no known workaround; full mechanism map in the handover (Part 2.1) and `analysis/byd/`
 
-## Estrutura do repositório
+## Repository structure
 
-| Pasta | Conteúdo | No git? |
+| Folder | Contents | In git? |
 |---|---|---|
-| `docs/` | Relatórios de sessão (histórico completo: unlock, KSU, OTA) | ✅ |
-| `scripts/build/` | Geradores .py (módulos Magisk/KSU, patches) | ✅ |
-| `scripts/analysis/` | Análise .py (certs, vbmeta, kernel, keybox) | ✅ |
-| `scripts/device/` | Shell que roda no aparelho (.sh) | ✅ |
-| `scripts/flash/` | `windows_install_upgrade_auto.bat` (flash ROM sem prompt) | ✅ |
-| `config/` | `keybox.xml` (DroidWin — referência pública) | ✅ |
-| `backup/` | Imagens de partição, dumps, backups | ❌ (grande) |
-| `rom/` | ROMs xiaomi.eu + extraídas | ❌ (~18 GB) |
-| `tools/` | Binários: platform-tools, APKs, módulos zip, magiskboot, ksud | ❌ (públicos) |
-| `quarantine/` | Ferramenta CVE do unlock + extraídos | parcial |
-| `updates/` | APKs/módulos de apps de sistema | ❌ |
+| `docs/` | Session reports (full history: unlock, KSU, OTA) | ✅ |
+| `scripts/build/` | .py generators (Magisk/KSU modules, patches) | ✅ |
+| `scripts/analysis/` | .py analysis (certs, vbmeta, kernel, keybox) | ✅ |
+| `scripts/device/` | Shell scripts that run on the device (.sh) | ✅ |
+| `scripts/flash/` | `windows_install_upgrade_auto.bat` (flash ROM without prompts) | ✅ |
+| `config/` | `keybox.xml` (DroidWin — public reference) | ✅ |
+| `backup/` | Partition images, dumps, backups | ❌ (large) |
+| `rom/` | xiaomi.eu ROMs + extracted | ❌ (~18 GB) |
+| `tools/` | Binaries: platform-tools, APKs, module zips, magiskboot, ksud | ❌ (public) |
+| `quarantine/` | Unlock CVE tool + extracted artifacts | partial |
+| `updates/` | System app APKs/modules | ❌ |
 
-Binários grandes/públicos ficam no disco mas fora do histórico (ver `.gitignore`).
+Large/public binaries live on disk but outside history (see `.gitignore`).
 
-## Procedimentos-chave (documentados em `docs/`)
+## Key procedures (documented in `docs/`)
 
-- **OTA xiaomi.eu:** flash via `scripts/flash/windows_install_upgrade_auto.bat` → re-patch do `init_boot` com `ksud boot-patch -m android16-6.12_kernelsu.ko --partition init_boot --allow-shell` → `fastboot flash init_boot_a`
-- **Rollback para Magisk:** `fastboot flash init_boot_a backup\ksu-migration\init_boot_a_backup.img`
-- **Keybox treadmill:** trocar `/data/adb/tricky_store/keybox.xml` quando revogado + reboot
-- **NUNCA** `fastboot flashing lock` · **NUNCA** editar vbmeta na mão · conferir sempre POPSICLE (não PANDORA) nos downloads
+- **xiaomi.eu OTA:** flash via `scripts/flash/windows_install_upgrade_auto.bat` → re-patch `init_boot` with `ksud boot-patch -m android16-6.12_kernelsu.ko --partition init_boot --allow-shell` → `fastboot flash init_boot_a`
+- **Rollback to Magisk:** `fastboot flash init_boot_a backup\ksu-migration\init_boot_a_backup.img`
+- **Keybox treadmill:** swap `/data/adb/tricky_store/keybox.xml` when revoked + reboot
+- **NEVER** `fastboot flashing lock` · **NEVER** edit vbmeta by hand · always double-check POPSICLE (not PANDORA) in downloads

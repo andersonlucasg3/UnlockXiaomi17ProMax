@@ -1,43 +1,44 @@
-# DeviceID+ (fork de sidex15/deviceidchanger)
+# DeviceID+ (fork of sidex15/deviceidchanger)
 
-Módulo KernelSU/Magisk com WebUI para gerenciar identificadores de dispositivo por app.
-Fork de [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), licenciado sob **AGPL-3.0** (ver `LICENSE`).
+KernelSU/Magisk module with WebUI to manage device identifiers per app.
+Fork of [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger), licensed under **AGPL-3.0** (see `LICENSE`).
 
-## Recursos
+## Features
 
-- **SSAID manager**: lista todos os pacotes instalados (filtro 3rd-party/todos + busca), mostra o SSAID atual de cada app, permite enrolar apps para spoof com ID global ou ID custom por app (16 hex). Edita `/data/system/users/0/settings_ssaid.xml` via `abx2xml`/`xml2abx`, inserindo entradas novas quando o app ainda não tem SSAID. Backup/restauração em `/storage/emulated/0/settings_ssaid.backup.xml`.
-- **Build props**: lista editável de pares chave=valor aplicados com `ksud resetprop` (imediato via botão e no boot via `service.sh`, após `boot_completed` — `post-fs-data.sh` é no-op: resetprop naquele estágio bootloopeia o aparelho).
-- **Props por app**: spoof de propriedades de sistema visível apenas para apps escolhidos, via biblioteca Zygisk própria (`zygisk/arm64-v8a.so`, fonte em `native/`). A lib carrega em `preAppSpecialize` as entradas do arquivo flat `.perapp_props` (linhas `pkg|chave=valor`, espelhado de `config.json` pela WebUI — **match por nome de processo**, ex.: `com.google.android.gms.persistent` é um alvo distinto de `com.google.android.gms`) e, apenas nos apps configurados, aplica três mecanismos: (1) **COW do prop_area** (`prop_cow.cpp`) — copia as páginas da prop para um mapping privado e reescreve o valor in-place, cobrindo qualquer caminho de leitura (JNI, nativo, parse direto, static-linked); (2) hooks GOT/PLT das funções bionic `__system_property_get`, `__system_property_read` e `__system_property_read_callback` (`perapp_hooks.cpp`); (3) **spoof de `android.os.Build.*` via JNI** (`deviceid_zygisk.cpp`) — reescreve os campos estáticos (MODEL, DEVICE, PRODUCT, BRAND, MANUFACTURER…) no processo do app, cobrindo leituras Java e WebView UA que os mecanismos de prop não alcançam (a classe Build é inicializada no zygote). Apps não configurados recebem `DLCLOSE_MODULE_LIBRARY` (nada fica mapeado). Vale ao reabrir o app — sem reboot. **Atenção**: o app alvo NÃO pode estar marcado em "umount modules" no KernelSU, senão o spoof não chega até ele.
-- **TrickyStore**: visualiza/edita `/data/adb/tricky_store/target.txt` (adicionar/remover pacotes), quando presente.
+- **SSAID manager**: lists all installed packages (3rd-party/all filter + search), shows the current SSAID for each app, allows enrolling apps for spoofing with a global ID or per-app custom ID (16 hex chars). Edits `/data/system/users/0/settings_ssaid.xml` via `abx2xml`/`xml2abx`, inserting new entries when the app has no SSAID yet. Backup/restore to `/storage/emulated/0/settings_ssaid.backup.xml`.
+- **Build props**: editable list of key=value pairs applied with `ksud resetprop` (immediate via button and on boot via `service.sh`, after `boot_completed` — `post-fs-data.sh` is a no-op: resetprop at that stage boot-loops the device).
+- **Per-app props**: system property spoofing visible only to chosen apps, via a custom Zygisk library (`zygisk/arm64-v8a.so`, source in `native/`). The lib loads, in `preAppSpecialize`, entries from the flat file `.perapp_props` (lines `pkg|key=value`, mirrored from `config.json` by the WebUI — **matches by process name**, e.g. `com.google.android.gms.persistent` is a distinct target from `com.google.android.gms`) and, only in configured apps, applies three mechanisms: (1) **prop_area COW** (`prop_cow.cpp`) — copies prop pages to a private mapping and rewrites the value in-place, covering any read path (JNI, native, direct parse, static-linked); (2) GOT/PLT hooks of the bionic functions `__system_property_get`, `__system_property_read` and `__system_property_read_callback` (`perapp_hooks.cpp`); (3) **`android.os.Build.*` spoof via JNI** (`deviceid_zygisk.cpp`) — rewrites the static fields (MODEL, DEVICE, PRODUCT, BRAND, MANUFACTURER…) in the app process, covering Java reads and WebView UA that the prop mechanisms don't reach (the Build class is initialized in the zygote). Non-configured apps receive `DLCLOSE_MODULE_LIBRARY` (nothing stays mapped). Takes effect on reopening the app — no reboot needed. **Note**: the target app MUST NOT be checked under "umount modules" in KernelSU, otherwise the spoof won't reach it.
+- **TrickyStore**: views/edits `/data/adb/tricky_store/target.txt` (add/remove packages), when present.
+- **Java DCK (BYD) hook**: control key `com.byd.bydautolink|dck.hook=1` in `.perapp_props` (not a prop — a module flag). In `postAppSpecialize`, only in that app, a lazy thread (`dck_hook.cpp`) waits for the app context and the GMS DCK SDK classes to exist, resolves the concrete class of `DigitalKeyFrameworkClient` via `getClient(ctx)` + `GetObjectClass`, marks `isCreateDigitalKeyPossible()` as `kAccNative` (flip of `ArtMethod::access_flags_`, offset 4 — stable layout since Android 12, validated on target Android 16) and registers a stub via `RegisterNatives` that returns `Tasks.forResult(Boolean.TRUE)`. Also hooks `DigitalKeyFramework.isDckFeatureAvailable(Context)` → `true`. No inline patch/Dobby. Any failure is a silent no-op. `.so` deployment requires reboot (ZygiskNext caches the lib in the zygote).
 
-## Estrutura
+## Structure
 
 ```
 module/
 ├── module.prop
 ├── customize.sh
-├── post-fs-data.sh   # no-op (spoof de props mora no service.sh)
-├── service.sh        # aplica props spoofadas após boot_completed
-├── config.json       # configuração persistida pela WebUI
+├── post-fs-data.sh   # no-op (prop spoof lives in service.sh)
+├── service.sh        # applies spoofed props after boot_completed
+├── config.json       # configuration persisted by the WebUI
 ├── zygisk/
-│   └── arm64-v8a.so  # spoof de props por app (fonte em ../native/)
+│   └── arm64-v8a.so  # per-app prop spoof (source in ../native/)
 └── webroot/
     ├── index.html
     └── app.js
 ```
 
-A WebUI espelha `config.json` em arquivos flat (`.props_enabled`, `.props_spoof`,
-`.perapp_props`) para que os scripts de boot e a lib zygisk não precisem de `jq`.
+The WebUI mirrors `config.json` into flat files (`.props_enabled`, `.props_spoof`,
+`.perapp_props`) so that boot scripts and the zygisk lib don't need `jq`.
 
-## Build da lib nativa
+## Native lib build
 
-Requer o clang do Termux (aarch64). Gera `module/zygisk/arm64-v8a.so`:
+Requires Termux clang (aarch64). Generates `module/zygisk/arm64-v8a.so`:
 
 ```sh
 cd native && ./build.sh
 ```
 
-Teste de fumaça on-device (prova o GOT patching no próprio processo):
+Smoke test on-device (proves GOT patching in the process itself):
 
 ```sh
 cd native && ./build.sh test && su -c "$PWD/test_hook"
@@ -45,25 +46,25 @@ cd native && ./build.sh test && su -c "$PWD/test_hook"
 
 ## Build
 
-Compacte o **conteúdo** de `module/` (não a pasta) em um zip:
+Zip the **contents** of `module/` (not the folder itself) into a zip:
 
 ```sh
 cd module && zip -r9 ../deviceidplus.zip .
 ```
 
-Instale pelo gerenciador KernelSU (KernelSU / KernelSU Next / APatch / Magisk com WebUI).
+Install via the KernelSU manager (KernelSU / KernelSU Next / APatch / Magisk with WebUI).
 
-## Requisitos
+## Requirements
 
-- Android 12+ (SSAID em formato ABX; XML plano também é suportado)
-- `abx2xml`/`xml2abx` no sistema (presentes no AOSP 12+)
-- Root com KernelSU ou equivalente com suporte a WebUI (`ksu.exec`, `ksu.toast`)
+- Android 12+ (SSAID in ABX format; plain XML is also supported)
+- `abx2xml`/`xml2abx` on the system (present in AOSP 12+)
+- Root with KernelSU or equivalent with WebUI support (`ksu.exec`, `ksu.toast`)
 
-## Aviso
+## Disclaimer
 
-Alterar SSAID e props de build pode violar termos de serviço de apps e disparar
-detecção de integridade. Use por sua conta e risco.
+Changing SSAID and build props may violate app terms of service and trigger
+integrity detection. Use at your own risk.
 
-## Créditos
+## Credits
 
-- Projeto original: [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger) (AGPL-3.0)
+- Original project: [sidex15/deviceidchanger](https://github.com/sidex15/deviceidchanger) (AGPL-3.0)

@@ -1,34 +1,34 @@
-# Bradesco Seguros + Revolut (DexProtector) — RESOLVIDO 27/jul/2026
+# Bradesco Seguros + Revolut (DexProtector) — RESOLVED 27/Jul/2026
 
-Resumo da frente vencedora. Detalhes operacionais completos: `docs/SESSION-HANDOVER.md` (Partes 2.4, 2.5, Sessão 11).
+Summary of the winning approach. Full operational details: `docs/SESSION-HANDOVER.md` (Parts 2.4, 2.5, Session 11).
 
-## Diagnóstico
+## Diagnosis
 
-- **Apps:** `br.com.bradseg.bscelular` v2.85.0 e `com.revolut.revolut` v10.140 — ambos protegidos por **DexProtector/Licel** (`lib/arm64-v8a/libdexprotector.so`).
-- **Sintoma:** tela "ambiente não seguro" (diálogo com OK) na 1ª execução; após `pm clear`, crash `android.app.TerminateException$<obf>` (o diálogo não abre em cold start por BAL_BLOCK do A16/targetSdk 36 → exceção não tratada mata o processo).
-- **Vetor raiz (ambos):** **enumeração de pacotes instalados** — o DexProtector lista pacotes via **Binder raw** (bypass de hooks Java do PackageManager) e flagra apps de root (`me.weishu.kernelsu` nomeado no digest pós-crash — `launch-log5.txt`). Telemetria do próprio app: `isRoot:false` (não é root clássico).
-- **Descartados:** key attestation (bradseguros não cria aliases no keystore; crash idêntico com daemon TrickyStore up/down), mounts, PI 3/3, su, frida, keybox vazada (hipótese da Sessão 10 p/ Revolut — **descartada**: funciona com keybox DroidWin).
+- **Apps:** `br.com.bradseg.bscelular` v2.85.0 and `com.revolut.revolut` v10.140 — both protected by **DexProtector/Licel** (`lib/arm64-v8a/libdexprotector.so`).
+- **Symptom:** "unsafe environment" screen (OK dialog) on 1st run; after `pm clear`, `android.app.TerminateException$<obf>` crash (the dialog does not open on cold start due to A16/targetSdk 36 BAL_BLOCK → unhandled exception kills the process).
+- **Root vector (both):** **installed package enumeration** — DexProtector lists packages via **raw Binder** (bypassing Java PackageManager hooks) and detects root apps (`me.weishu.kernelsu` named in the post-crash digest — `launch-log5.txt`). App's own telemetry: `isRoot:false` (not classic root).
+- **Ruled out:** key attestation (bradseguros does not create keystore aliases; identical crash with TrickyStore daemon up/down), mounts, PI 3/3, su, frida, leaked keybox (Session 10 hypothesis for Revolut — **ruled out**: works with DroidWin keybox).
 
-## Solução (permanente)
+## Solution (permanent)
 
-**HMA-OSS oss-164** (fork Zygisk do Hide My Applist, sem LSPosed): filtra a applist no **system_server** — cobre inclusive a enumeração por Binder raw.
+**HMA-OSS oss-164** (Zygisk fork of Hide My Applist, no LSPosed): filters the applist at the **system_server** level — covers even raw Binder enumeration.
 
 - Zip: `tools/hma_oss/HMA-OSS-ZYGISK-oss-164-release.zip` (sha256 `4bf157db64f0daa59137436fef8eafeb3180d0fd545ca2e1196b47aa8abef9fa`), id `hma_oss_zygisk`, manager `org.frknkrc44.hma_oss`.
-- Template `bancos` = **whitelist vazia** (app-alvo não vê NENHUM user app) aplicado aos 2 pacotes.
-- Config: `/data/misc/hide_my_applist_hmaosspreseedab/config.json` (o serviço reusa o 1º dir `hide_my_applist*` de /data/misc; esta foi pré-semeada e adotada).
-- Fonte do formato de config (CONFIG_VERSION=93) em `hma-oss/*.kt` (referência).
+- Template `bancos` = **empty whitelist** (target app does not see ANY user app) applied to both packages.
+- Config: `/data/misc/hide_my_applist_hmaosspreseedab/config.json` (the service reuses the 1st `hide_my_applist*` dir under /data/misc; this one was pre-seeded and adopted).
+- Config format reference (CONFIG_VERSION=93) in `hma-oss/*.kt`.
 
-## Lições operacionais
+## Operational lessons
 
-1. **HMA-OSS: config só aplica AO VIVO via manager app** (ServiceClient, assinatura verificada). Editar o JSON em disco só vale no boot seguinte (serviço lê uma vez no init).
-2. **"Ativar" sozinho = blacklist vazio (não esconde nada).** Precisa: modo "Esconder" (whitelist) + template aplicado.
-3. Prova da filtragem no log: `<datadir>/log/runtime.log` → `@shouldFilterApplication: query from <pkg>`.
-4. **Anti-tamper do daemon TrickyStore:** verifica integridade dos arquivos do módulo; qualquer edição (ex.: `DEBUG=true` no service.sh) = daemon morre com exit 1 silencioso. Reinício manual: `cd /data/adb/modules/tricky_store && (setsid sh ./service.sh >/dev/null 2>&1 </dev/null &)`. NUNCA `pkill -f TrickyStore` via adb shell (mata o próprio shell — a cmdline contém a string).
-5. Novo app bancário bloqueando com essa tela: HMA-OSS → "Gerenciar apps" → app → "Ativar" + "Esconder" + template `bancos`. Sem reboot.
+1. **HMA-OSS: config only applies LIVE via manager app** (ServiceClient, verified signature). Editing the JSON on disk only takes effect on the next boot (service reads it once at init).
+2. **"Enable" alone = empty blacklist (hides nothing).** Required: "Hide" mode (whitelist) + template applied.
+3. Proof of filtering in the log: `<datadir>/log/runtime.log` → `@shouldFilterApplication: query from <pkg>`.
+4. **TrickyStore daemon anti-tamper:** verifies module file integrity; any edit (e.g. `DEBUG=true` in service.sh) = daemon dies with silent exit 1. Manual restart: `cd /data/adb/modules/tricky_store && (setsid sh ./service.sh >/dev/null 2>&1 </dev/null &)`. NEVER `pkill -f TrickyStore` via adb shell (kills the shell itself — the cmdline contains the string).
+5. New banking app blocking with this screen: HMA-OSS → "Manage apps" → app → "Enable" + "Hide" + template `bancos`. No reboot.
 
-## Artefatos
+## Artifacts
 
-- `launch-log1..5.txt` — logs de lançamento (log5 = o digest `me.weishu.kernelsu have been installed` + TerminateException).
-- `ui-dump1.xml` — a tela de bloqueio (diálogo título "Bradesco Seguros" + botão OK).
-- `hma-oss/` — config pré-semeada + fontes do formato (JsonConfig/ConfigManager/HMAService/Constants, repo frknkrc44/HMA-OSS).
-- APKs e libs nativas ficam no disco (gitignored). Decompilação jadx regenerável: `tools/jadx-pull/jadx`.
+- `launch-log1..5.txt` — launch logs (log5 = the `me.weishu.kernelsu have been installed` digest + TerminateException).
+- `ui-dump1.xml` — the blocking screen (dialog titled "Bradesco Seguros" + OK button).
+- `hma-oss/` — pre-seeded config + format sources (JsonConfig/ConfigManager/HMAService/Constants, repo frknkrc44/HMA-OSS).
+- APKs and native libs live on disk (gitignored). Regeneratable jadx decompilation: `tools/jadx-pull/jadx`.
