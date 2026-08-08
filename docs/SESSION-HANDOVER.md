@@ -1,13 +1,14 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Living continuity document between sessions. Last updated: 28/Jul/2026 (Session 13 — BYD digital key front REOPENED; DeviceID+ v2.3.1 with native DCK hook). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK).**
+**Living continuity document between sessions. Last updated: 08/Aug/2026 (Session 14 — OTA 317→318; OTA via UI failed/TWRP bootloop, resolved via fastboot `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK).**
 
 ---
 
-## PART 1 — CURRENT STATE (snapshot 24/Jul/2026 ~23:45)
+## PART 1 — CURRENT STATE (snapshot 08/Aug/2026 ~23:45)
 
 ### 1.1 Device and ROM
 - **Device:** Xiaomi 17 Pro Max (`popsicle`, 2509FPN0BC), SD 8 Elite Gen 5, Android 16 (SDK 36)
-- **ROM:** xiaomi.eu **OS3.0.317.0.WPBCNXM**
+- **ROM:** xiaomi.eu **OS3.0.318.0.WPBCNXM**
+  - OTA from 317 to 318: UI OTA failed (TWRP bootloop); resolved via fastboot flash using `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot. All configs preserved.
 - **Kernel:** stock `6.12.23-android16-5-...-abogki463945075-4k` (untouched)
 - **Bootloader:** unlocked (NEVER re-lock)
 - **Recovery:** TWRP 3.7.1 unofficial (variant `fix22ZX_pinwork_partialdecryption`) — kept as safety net, decrypts /data with PIN (saved us from the 2 Caixa bootloops)

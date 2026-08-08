@@ -2,7 +2,7 @@
 
 Step-by-step reproducible guide: bootloader unlock → xiaomi.eu ROM → KernelSU LKM root with full hiding stack. **Device-specific for the Xiaomi 17 Pro Max** (`popsicle`, 2509FPN0BC, China-only, Snapdragon 8 Elite Gen 5, HyperOS 3 / Android 16). Many steps are generic Xiaomi; popsicle-specific quirks are called out explicitly.
 
-**As of 28/Jul/2026.** For the latest state, versions, and known issues, see [`docs/SESSION-HANDOVER.md`](docs/SESSION-HANDOVER.md) — the living continuity document.
+**As of 08/Aug/2026.** For the latest state, versions, and known issues, see [`docs/SESSION-HANDOVER.md`](docs/SESSION-HANDOVER.md) — the living continuity document.
 
 ---
 
@@ -32,7 +32,7 @@ Step-by-step reproducible guide: bootloader unlock → xiaomi.eu ROM → KernelS
 ### 1.2 Downloads — ROM
 
 - **xiaomi.eu ROM for POPSICLE** — **NOT pandora** (17 Pro) or pudding (17 base).
-  - Current as of this guide: `OS3.0.317.0.WPBCNXM` (Android 16, HyperOS 3).
+  - Current as of this guide: `OS3.0.318.0.WPBCNXM` (Android 16, HyperOS 3).
   - Download from [xiaomi.eu](https://xiaomi.eu/community/) — always verify the filename contains `POPSICLE`.
   - The ROM ships as a fastboot-flashable zip. Extract it; you will use the `windows_install_upgrade.bat` script (or the `_auto.bat` variant that skips the interactive prompt — see [`scripts/flash/`](scripts/flash/)).
 
