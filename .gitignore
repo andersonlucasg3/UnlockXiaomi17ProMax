@@ -8,6 +8,8 @@ tools/zn_extracted/
 tools/ts_extracted/
 tools/ksu_apk/
 quarantine/extracted/
+# Forense BYD/DCK — artefatos grandes (APKs, dex, jadx, logs). Relatorio em docs/relatorio-sessao-2026-08-29.md
+analysis/byd/
 __MACOSX/
 .DS_Store
 *.zip

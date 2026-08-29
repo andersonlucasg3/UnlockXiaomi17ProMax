@@ -1,5 +1,5 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Living continuity document between sessions. Last updated: 08/Aug/2026 (Session 14 — OTA 317→318; OTA via UI failed/TWRP bootloop, resolved via fastboot `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK).**
+**Living continuity document between sessions. Last updated: 08/Aug/2026 (Session 14 — OTA 317→318; OTA via UI failed/TWRP bootloop, resolved via fastboot `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK), `docs/relatorio-sessao-2026-08-29.md` (29/Aug, BYD DCK — injeção fix + gate real é o flag Phenotype do GMS).**
 
 ---
 
@@ -33,7 +33,7 @@
 | Bradesco Seguros | ✅ **RESOLVED 27/Jul ~11:20** — vector: package enumeration; fix: HMA-OSS (Part 2.5) |
 | **Petal Maps 4.7.0.319** | ✅ **RESOLVED 24/Jul ~18:20** — COW prop_area validated: `Get Manufacturer: HUAWEI`, app passes the gate (Part 2.2) |
 | **YT Music Morphe 9.15.51 (AA)** | ✅ **RESOLVED 27/Jul** — podcasts work on Android Auto; music requires YouTube Premium (server-side, ReVanced#6185). Fix: `tcn.c→false` (Dynamite bypass) + 37 CLI patches (Part 2.6 / Session 12) |
-| **BYD digital key** | 🔄 **REOPENED 28/Jul** — DeviceID+ v2.3.1 native DCK hook deployed; validation pending (Part 2.1). App itself runs without crash since KSU migration |
+| **BYD digital key** | 🔄 **ATIVA (29/Aug)** — injeção Zygisk no BYD FUNCIONA (KSU profile fix); hook `zzfa` obsoleto (app 3.5.1 + GMS 26.34.31); gate real = flag Phenotype GMS `DckStub__full_module_download_allowed` (Part 2.1) |
 
 ### 1.4 DeviceID+ Module (own fork)
 - **Location:** `modules/deviceidchanger/` (AGPL fork of sidex15/deviceidchanger, credits in README/LICENSE). Zip rebuild: `native/build.sh` (the `.so`) + zip the `module/` folder (zip gitignored; `build_zip.ps1` on Windows). build.sh targets: no arg = module; `test` = smoke test `test_hook`; `inspect` = standalone inspector in /data/local/tmp
@@ -62,8 +62,8 @@
 
 ## PART 2 — PENDING ITEMS
 
-### 2.1 BYD digital key (🔄 REOPENED 28/Jul — Session 13; DeviceID+ v2.3.1 native DCK hook deployed, validation pending)
-**Goal:** provision the BYD digital key (Destroyer 05/King BR) on the phone. **Current state: v2.3.1 passive native hook deployed, `dck.hook=1` armed, umount OFF for BYD — awaiting final validation.** The phenotype route was exhausted in Session 9 (production GMS does not apply overrides). The new strategy bypasses the `downloadAllowed` gate entirely: hook `isCreateDigitalKeyPossible()→true` in the app process via Zygisk, exploiting the fact that the compatibility verdict is local (GMS DCK stub) + memoized in MMKV.
+### 2.1 BYD digital key (🔄 ATIVA — Session 15, 29/Aug; ver `docs/relatorio-sessao-2026-08-29.md`)
+**Goal:** provision the BYD digital key (Destroyer 05/King BR) on the phone. **Current state (29/Aug):** injeção Zygisk no BYD funciona (causa raiz da falha: perfil KSU com `use_default=1` → umount efetivo ON → ZN denylist; fix via toggle no manager → `+0x110=0,+0x111=0`). App atualizou para **v3.5.1** e GMS **26.34.31**: a classe `zzfa` não existe mais — o hook v2.3.1 é obsoleto. O módulo DCK Chimera **existe** no device (`dl-Dck.optional_263431150400.apk`); a decisão é GMS-side em `m20.mdv.e()`: `hasWccSupport` (✅ via `ro.gms.dck.eligible_wcc=3`, volátil) AND `downloadAllowed` = flag Phenotype **`DckStub__full_module_download_allowed`** (default false — **gate atual**). Tentativas de override (phenotype.db insert + append no `.pb` CE) falharam: GMS regenera o `.pb` e o commit de `flag_overrides_to_commit` nunca roda. Próximo passo: retomar análise do snapshot comprimido (`aalz`) — artefatos em `analysis/byd/` (não commitados, ~800 MB).
 
 **New discoveries (Session 13 — 28/Jul ~21:10 → 29/Jul ~01:00):**
 
@@ -369,6 +369,13 @@
 8. **Incidents:** bootloop during GMS Frida crash (device recovered); Play Protect flag (monitor PI). KSU umount reverted by bootloop → user turned OFF again. New rule: verify umount after any boot incident.
 9. **Artifacts:** `native/dck_hook.{cpp,h}`, modified `deviceid_zygisk.cpp`/`build.sh`/`module.prop`; `tools/frida-agent/` (byd-dck-hook.js, gms-dck-unlock.js, byd-antitamper.js, Python runners); `analysis/byd/gms_dck_run.log`; `tools/venv-frida16/` (Frida 16 stealth attempt — do not commit if large).
 
+### Session 15 (29/Aug — BYD DCK: injeção consertada; gate real = flag Phenotype do GMS)
+1. **Não-injeção RESOLVIDA:** perfil KSU do BYD tinha `use_default=1` → umount efetivo ON → ZN 1.5.0 tratava como denylist. Fix: toggle "Umount modules" no manager (gravou `use_default=0`). Injeção DeviceID+ confirmada (maps + logs).
+2. **Hook `zzfa` obsoleto:** app BYD v3.5.1 (dex real criptografado por DexProtector/Bangcle — stub de 90 KB), GMS 26.34.31 sem `zzfa`. Módulo DCK Chimera **presente** no device; impl em `m20.*` (`m20.tuc` = op `IsCreateDigitalKeyPossible`; veredito em `m20.mdv.e()`).
+3. **`ro.gms.dck.eligible_wcc=3` funciona:** log GMS `wccSysProp: 3`, `hasWccSupport` passa. Wall atual: `downloadAllowed: false` ← flag `DckStub__full_module_download_allowed` (default false, FilePhenotypeFlags).
+4. **Overrides falharam:** insert em `flag_overrides`+`flag_overrides_to_commit` (commit nunca processado); append no `.pb` CE real — GMS regenera o arquivo do served config. Em FilePhenotypeFlags, flags `i()==false` só honram valores do arquivo se o nome estiver no override set do **snapshot comprimido** (`aalz`).
+5. **Backup:** `dck.pb.bak` no device. Override pendente no phenotype.db (id 532; reversível via delete). Próximo: snapshot `aalz` ou hook Zygisk GMS-side em `m20.altg.e()`. Detalhes: `docs/relatorio-sessao-2026-08-29.md`.
+
 ### Session 10 (25/Jul morning — Revolut: full forensics + `.ko` with hide, not resolved)
 1. **Diagnosis:** visible vectors confirmed as app uid: `/proc/modules` ksu, `/sys/module/ksu`, `/system/bin/su`. prctl harmless (fact 30). SuSFS ruled out (fact 31).
 2. **Tests that failed:** adb root OFF (no su), frida-server removed, manager frozen, new SSAID + clear data, per-app injection with Pixel 10 spoof (detected by maps scan — fact 32).
@@ -395,4 +402,4 @@
 - **Frida 17:** java-bridge was removed from core → scripts need to be **bundled with esbuild** (`frida-java-bridge`). `enumerate_processes()` may not list certain apps → use `pidof` via adb + attach by PID. **Always stop frida-server after use** (detection vector for banking apps)
 - **Frida + GMS = dangerous:** GMS has an internal anti-Frida selfchecker that causes SIGSEGV crash loops and can reboot the device. Never attach Frida to `com.google.android.gms`.
 - **DexProtector/Licel apps (BYD, Revolut, Bradseguros):** refuse to run under ptrace/Frida — SIGSEGV within seconds. Zygisk is the only viable hook route for these apps.
-- **KSU umount per app reverts on bootloop/recovery:** verify "Umount modules" toggle in KSU manager after any boot incident. Flag lives at offset `f272` in `/data/adb/ksu/.allowlist` (stride 784).
+- **KSU umount per app reverts on bootloop/recovery:** verify "Umount modules" toggle in KSU manager after any boot incident. `.allowlist` (stride 784): flags reais são `+0x108`=allow_su, `+0x110`=use_default, `+0x111`=umount_modules (o `+0xF2` citado antes está errado — é lixo de template_name). **`use_default=1` faz o kernel aplicar o padrão `umount=true` mesmo com o flag individual `0`** — foi a causa raiz da não-injeção Zygisk no BYD (Session 15).
