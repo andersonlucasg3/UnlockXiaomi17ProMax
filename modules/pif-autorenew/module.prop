@@ -1,0 +1,6 @@
+id=pif-autorenew
+name=PIF Auto-Renew
+version=v1.0
+versionCode=1
+author=anderson
+description=Renova automaticamente o custom.pif.prop do PlayIntegrityFork quando faltar menos de 7 dias para expirar (roda autopif4.sh no boot).
