@@ -32,7 +32,7 @@ Step-by-step reproducible guide: bootloader unlock → xiaomi.eu ROM → KernelS
 ### 1.2 Downloads — ROM
 
 - **xiaomi.eu ROM for POPSICLE** — **NOT pandora** (17 Pro) or pudding (17 base).
-  - Current as of this guide: `OS3.0.318.0.WPBCNXM` (Android 16, HyperOS 3).
+  - Current as of this guide: `OS3.0.319.0.WPBCNXM` (Android 16, HyperOS 3).
   - Download from [xiaomi.eu](https://xiaomi.eu/community/) — always verify the filename contains `POPSICLE`.
   - The ROM ships as a fastboot-flashable zip. Extract it; you will use the `windows_install_upgrade.bat` script (or the `_auto.bat` variant that skips the interactive prompt — see [`scripts/flash/`](scripts/flash/)).
 
@@ -381,6 +381,8 @@ When a new ROM version is released:
    ```
 
 6. Reboot → new ROM + KSU alive.
+
+**Variant used in the 318→319 update (simpler):** replace `images\init_boot.img` in the extracted ROM folder with the pre-patched image **before** running the script, and remove the `flash recovery_ab` line (preserves TWRP). Root is then active from the very first boot, with no extra fastboot round-trip.
 
 **Why pre-patch:** the flash script writes the stock `init_boot` to both slots and boots with `set_active a`. If you reboot without flashing the patched image first, you boot into stock → no root → no `ksud` to patch from the running system → you need a PC to fastboot-flash the patched image anyway. Pre-patching avoids the extra round-trip.
 

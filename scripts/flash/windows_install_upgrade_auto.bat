@@ -63,7 +63,7 @@ echo ##############################################################
 %fastboot% flash boot_ab images\boot.img
 %fastboot% flash init_boot_ab images\init_boot.img
 %fastboot% flash vendor_boot_ab images\vendor_boot.img
-%fastboot% flash recovery_ab images\recovery.img
+REM recovery NAO flasheado — preserva TWRP (reflash manual: fastboot flash recovery tools\twrp-popsicle.img)
 %fastboot% flash super images\super.img.0
 %fastboot% flash super images\super.img.1
 %fastboot% flash super images\super.img.2

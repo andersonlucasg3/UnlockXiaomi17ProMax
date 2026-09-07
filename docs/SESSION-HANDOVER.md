@@ -1,13 +1,14 @@
 # SESSION HANDOVER — UnlockXiaomi (popsicle)
-**Living continuity document between sessions. Last updated: 08/Aug/2026 (Session 14 — OTA 317→318; OTA via UI failed/TWRP bootloop, resolved via fastboot `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK), `docs/relatorio-sessao-2026-08-29.md` (29/Aug, BYD DCK — injeção fix + gate real é o flag Phenotype do GMS).**
+**Living continuity document between sessions. Last updated: 07/Sep/2026 (Session 16 — OTA 318→319 via fastboot com init_boot pré-patched KSU substituindo o stock em `images\`; linha do recovery removida do script → TWRP preservado; flash limpo, root ativo no 1º boot). Detailed chronological history: `docs/relatorio-sessao-2026-07-22.md` (21–22/Jul, KSU root), `docs/relatorio-sessao-2026-07-27.md` (27/Jul, YT Music AA), `docs/relatorio-sessao-2026-07-28.md` (28/Jul, BYD DCK), `docs/relatorio-sessao-2026-08-29.md` (29/Aug, BYD DCK — injeção fix + gate real é o flag Phenotype do GMS).**
 
 ---
 
-## PART 1 — CURRENT STATE (snapshot 08/Aug/2026 ~23:45)
+## PART 1 — CURRENT STATE (snapshot 07/Sep/2026)
 
 ### 1.1 Device and ROM
 - **Device:** Xiaomi 17 Pro Max (`popsicle`, 2509FPN0BC), SD 8 Elite Gen 5, Android 16 (SDK 36)
-- **ROM:** xiaomi.eu **OS3.0.318.0.WPBCNXM**
+- **ROM:** xiaomi.eu **OS3.0.319.0.WPBCNXM**
+  - Update 318→319 (07/Sep): fastboot flash com `windows_install_upgrade_auto.bat` modificado (`rom/319/extracted/`): `images\init_boot.img` substituído pelo **patched KSU** antes do flash (root ativo já no 1º boot) e linha `flash recovery_ab` **removida** (TWRP preservado). md5 do zip validado (`fe7c7b16…`). Backups: `backup/init_boot_318_ksu_a.img` (anterior, com KSU) e `backup/init_boot_319_stock.img`. Patched: `rom/319/init_boot_319_ksu.img`.
   - OTA from 317 to 318: UI OTA failed (TWRP bootloop); resolved via fastboot flash using `windows_install_upgrade_auto.bat` with pre-patched KSU init_boot. All configs preserved.
 - **Kernel:** stock `6.12.23-android16-5-...-abogki463945075-4k` (untouched)
 - **Bootloader:** unlocked (NEVER re-lock)
